@@ -1,0 +1,143 @@
+{
+  "admin": {
+    "listen": "localhost:2019"
+  },
+  "apps": {
+    "http": {
+      "servers": {
+        "hatch_http": {
+          "listen": [
+            ":80"
+          ],
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "static_response",
+                  "headers": {
+                    "Location": [
+                      "https://{http.request.host}{http.request.uri}"
+                    ]
+                  },
+                  "status_code": "302"
+                }
+              ],
+              "match": [
+                {
+                  "host": [
+                    "*.jammjar.test",
+                    "jammjar.test"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "hatch_https": {
+          "automatic_https": {},
+          "listen": [
+            ":443"
+          ],
+          "routes": [
+            {
+              "handle": [
+                {
+                  "flush_interval": -1,
+                  "handler": "reverse_proxy",
+                  "headers": {
+                    "request": {
+                      "set": {
+                        "Connection": [
+                          "{http.request.header.Connection}"
+                        ],
+                        "Upgrade": [
+                          "{http.request.header.Upgrade}"
+                        ]
+                      }
+                    }
+                  },
+                  "upstreams": [
+                    {
+                      "dial": "localhost:6001"
+                    }
+                  ]
+                }
+              ],
+              "match": [
+                {
+                  "host": [
+                    "ws.jammjar.test"
+                  ]
+                }
+              ],
+              "terminal": true
+            },
+            {
+              "handle": [
+                {
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "localhost:8000"
+                    }
+                  ]
+                }
+              ],
+              "match": [
+                {
+                  "host": [
+                    "jammjar.test"
+                  ],
+                  "path": [
+                    "/api/*"
+                  ]
+                }
+              ],
+              "terminal": true
+            },
+            {
+              "handle": [
+                {
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "localhost:3000"
+                    }
+                  ]
+                }
+              ],
+              "match": [
+                {
+                  "host": [
+                    "jammjar.test"
+                  ]
+                }
+              ],
+              "terminal": true
+            }
+          ],
+          "tls_connection_policies": [
+            {}
+          ]
+        }
+      }
+    },
+    "tls": {
+      "automation": {
+        "policies": [
+          {
+            "issuers": [
+              {
+                "module": "internal"
+              }
+            ],
+            "subjects": [
+              "*.jammjar.test",
+              "jammjar.test"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

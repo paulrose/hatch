@@ -1,0 +1,499 @@
+package caddy
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/paulrose/hatch/internal/config"
+)
+
+// jammjarConfig returns the full jammjar example config used in golden file tests.
+func jammjarConfig() config.Config {
+	return config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			TLD:       "test",
+			HTTPPort:  80,
+			HTTPSPort: 443,
+			AutoStart: true,
+			LogLevel:  "info",
+		},
+		Projects: map[string]config.Project{
+			"jammjar": {
+				Domain:  "jammjar.test",
+				Path:    "/path/to/jammjar",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"web": {Proxy: "http://localhost:3000"},
+					"api": {Proxy: "http://localhost:8000", Route: "/api/*"},
+					"ws":  {Proxy: "http://localhost:6001", Subdomain: "ws", WebSocket: true},
+				},
+			},
+		},
+	}
+}
+
+func TestTranslate_SingleService(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"myapp": {
+				Domain:  "myapp.test",
+				Path:    "/path/to/myapp",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"web": {Proxy: "http://localhost:3000"},
+				},
+			},
+		},
+	}
+
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	httpsServer := servers["hatch_https"].(map[string]any)
+	routes := httpsServer["routes"].([]map[string]any)
+
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+
+	route := routes[0]
+	match := route["match"].([]map[string]any)[0]
+	hosts := match["host"].([]string)
+	if hosts[0] != "myapp.test" {
+		t.Errorf("expected host myapp.test, got %s", hosts[0])
+	}
+
+	handler := route["handle"].([]map[string]any)[0]
+	if handler["handler"] != "reverse_proxy" {
+		t.Errorf("expected handler reverse_proxy, got %s", handler["handler"])
+	}
+	upstreams := handler["upstreams"].([]map[string]any)
+	if upstreams[0]["dial"] != "localhost:3000" {
+		t.Errorf("expected dial localhost:3000, got %s", upstreams[0]["dial"])
+	}
+
+	if route["terminal"] != true {
+		t.Error("expected terminal: true")
+	}
+}
+
+func TestTranslate_PathRouting(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"myapp": {
+				Domain:  "myapp.test",
+				Path:    "/path/to/myapp",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"api": {Proxy: "http://localhost:8000", Route: "/api/*"},
+				},
+			},
+		},
+	}
+
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
+
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+
+	match := routes[0]["match"].([]map[string]any)[0]
+	paths, ok := match["path"].([]string)
+	if !ok {
+		t.Fatal("expected path matcher to be present")
+	}
+	if paths[0] != "/api/*" {
+		t.Errorf("expected path /api/*, got %s", paths[0])
+	}
+}
+
+func TestTranslate_SubdomainRouting(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"myapp": {
+				Domain:  "myapp.test",
+				Path:    "/path/to/myapp",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"docs": {Proxy: "http://localhost:4000", Subdomain: "docs"},
+				},
+			},
+		},
+	}
+
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
+
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+
+	match := routes[0]["match"].([]map[string]any)[0]
+	hosts := match["host"].([]string)
+	if hosts[0] != "docs.myapp.test" {
+		t.Errorf("expected host docs.myapp.test, got %s", hosts[0])
+	}
+}
+
+func TestTranslate_WebSocket(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"myapp": {
+				Domain:  "myapp.test",
+				Path:    "/path/to/myapp",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"ws": {Proxy: "http://localhost:6001", Subdomain: "ws", WebSocket: true},
+				},
+			},
+		},
+	}
+
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
+
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+
+	handler := routes[0]["handle"].([]map[string]any)[0]
+
+	flush, ok := handler["flush_interval"]
+	if !ok {
+		t.Fatal("expected flush_interval to be set")
+	}
+	if flush != -1 {
+		t.Errorf("expected flush_interval -1, got %v", flush)
+	}
+
+	headers := handler["headers"].(map[string]any)
+	reqHeaders := headers["request"].(map[string]any)
+	setHeaders := reqHeaders["set"].(map[string]any)
+
+	connHeader := setHeaders["Connection"].([]string)
+	if connHeader[0] != "{http.request.header.Connection}" {
+		t.Errorf("unexpected Connection header: %s", connHeader[0])
+	}
+
+	upgradeHeader := setHeaders["Upgrade"].([]string)
+	if upgradeHeader[0] != "{http.request.header.Upgrade}" {
+		t.Errorf("unexpected Upgrade header: %s", upgradeHeader[0])
+	}
+}
+
+func TestTranslate_RouteOrdering(t *testing.T) {
+	cfg := jammjarConfig()
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
+
+	if len(routes) != 3 {
+		t.Fatalf("expected 3 routes, got %d", len(routes))
+	}
+
+	// Route 0: subdomain (ws.jammjar.test)
+	host0 := routes[0]["match"].([]map[string]any)[0]["host"].([]string)[0]
+	if host0 != "ws.jammjar.test" {
+		t.Errorf("route 0: expected ws.jammjar.test, got %s", host0)
+	}
+
+	// Route 1: path (/api/*)
+	match1 := routes[1]["match"].([]map[string]any)[0]
+	host1 := match1["host"].([]string)[0]
+	path1 := match1["path"].([]string)[0]
+	if host1 != "jammjar.test" {
+		t.Errorf("route 1: expected jammjar.test, got %s", host1)
+	}
+	if path1 != "/api/*" {
+		t.Errorf("route 1: expected /api/*, got %s", path1)
+	}
+
+	// Route 2: catch-all (jammjar.test)
+	match2 := routes[2]["match"].([]map[string]any)[0]
+	host2 := match2["host"].([]string)[0]
+	if host2 != "jammjar.test" {
+		t.Errorf("route 2: expected jammjar.test, got %s", host2)
+	}
+	if _, hasPath := match2["path"]; hasPath {
+		t.Error("route 2: catch-all should not have path matcher")
+	}
+}
+
+func TestTranslate_DisabledSkipped(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"disabled": {
+				Domain:  "disabled.test",
+				Path:    "/path/to/disabled",
+				Enabled: false,
+				Services: map[string]config.Service{
+					"web": {Proxy: "http://localhost:3000"},
+				},
+			},
+		},
+	}
+
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
+
+	if len(routes) != 0 {
+		t.Errorf("expected 0 routes for disabled project, got %d", len(routes))
+	}
+}
+
+func TestTranslate_MultipleProjects(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"alpha": {
+				Domain:  "alpha.test",
+				Path:    "/path/to/alpha",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"web": {Proxy: "http://localhost:3000"},
+				},
+			},
+			"beta": {
+				Domain:  "beta.test",
+				Path:    "/path/to/beta",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"web": {Proxy: "http://localhost:4000"},
+				},
+			},
+		},
+	}
+
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
+
+	if len(routes) != 2 {
+		t.Fatalf("expected 2 routes, got %d", len(routes))
+	}
+
+	// Routes should be alphabetical (both are catch-all tier).
+	host0 := routes[0]["match"].([]map[string]any)[0]["host"].([]string)[0]
+	host1 := routes[1]["match"].([]map[string]any)[0]["host"].([]string)[0]
+	if host0 != "alpha.test" {
+		t.Errorf("route 0: expected alpha.test, got %s", host0)
+	}
+	if host1 != "beta.test" {
+		t.Errorf("route 1: expected beta.test, got %s", host1)
+	}
+}
+
+func TestTranslate_HTTPRedirects(t *testing.T) {
+	cfg := jammjarConfig()
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	httpServer := servers["hatch_http"].(map[string]any)
+	routes := httpServer["routes"].([]map[string]any)
+
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 redirect route, got %d", len(routes))
+	}
+
+	match := routes[0]["match"].([]map[string]any)[0]
+	hosts := match["host"].([]string)
+
+	// Should include base domain and wildcard (sorted).
+	if len(hosts) != 2 {
+		t.Fatalf("expected 2 hosts in redirect, got %d", len(hosts))
+	}
+	if hosts[0] != "*.jammjar.test" {
+		t.Errorf("expected *.jammjar.test, got %s", hosts[0])
+	}
+	if hosts[1] != "jammjar.test" {
+		t.Errorf("expected jammjar.test, got %s", hosts[1])
+	}
+
+	handler := routes[0]["handle"].([]map[string]any)[0]
+	if handler["handler"] != "static_response" {
+		t.Errorf("expected static_response handler, got %s", handler["handler"])
+	}
+	if handler["status_code"] != "302" {
+		t.Errorf("expected status 302, got %s", handler["status_code"])
+	}
+}
+
+func TestTranslate_TLSAutomation(t *testing.T) {
+	cfg := jammjarConfig()
+	result := Translate(cfg)
+
+	tls := result["apps"].(map[string]any)["tls"].(map[string]any)
+	automation := tls["automation"].(map[string]any)
+	policies := automation["policies"].([]map[string]any)
+
+	if len(policies) != 1 {
+		t.Fatalf("expected 1 TLS policy, got %d", len(policies))
+	}
+
+	subjects := policies[0]["subjects"].([]string)
+	if len(subjects) != 2 {
+		t.Fatalf("expected 2 TLS subjects, got %d", len(subjects))
+	}
+	if subjects[0] != "*.jammjar.test" {
+		t.Errorf("expected *.jammjar.test, got %s", subjects[0])
+	}
+	if subjects[1] != "jammjar.test" {
+		t.Errorf("expected jammjar.test, got %s", subjects[1])
+	}
+
+	issuers := policies[0]["issuers"].([]map[string]any)
+	if issuers[0]["module"] != "internal" {
+		t.Errorf("expected internal issuer, got %s", issuers[0]["module"])
+	}
+}
+
+func TestTranslate_CustomPorts(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  8080,
+			HTTPSPort: 8443,
+		},
+		Projects: map[string]config.Project{},
+	}
+
+	result := Translate(cfg)
+
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+
+	httpsListen := servers["hatch_https"].(map[string]any)["listen"].([]string)
+	if httpsListen[0] != ":8443" {
+		t.Errorf("expected :8443, got %s", httpsListen[0])
+	}
+
+	httpListen := servers["hatch_http"].(map[string]any)["listen"].([]string)
+	if httpListen[0] != ":8080" {
+		t.Errorf("expected :8080, got %s", httpListen[0])
+	}
+}
+
+func TestTranslate_EmptyConfig(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{},
+	}
+
+	result := Translate(cfg)
+
+	// Should still produce valid structure.
+	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+
+	httpsRoutes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
+	if len(httpsRoutes) != 0 {
+		t.Errorf("expected 0 HTTPS routes, got %d", len(httpsRoutes))
+	}
+
+	httpRoutes := servers["hatch_http"].(map[string]any)["routes"].([]map[string]any)
+	if len(httpRoutes) != 0 {
+		t.Errorf("expected 0 HTTP routes, got %d", len(httpRoutes))
+	}
+
+	tls := result["apps"].(map[string]any)["tls"].(map[string]any)
+	policies := tls["automation"].(map[string]any)["policies"].([]map[string]any)
+	if len(policies) != 0 {
+		t.Errorf("expected 0 TLS policies, got %d", len(policies))
+	}
+}
+
+func TestTranslate_GoldenFile(t *testing.T) {
+	cfg := jammjarConfig()
+	result := Translate(cfg)
+
+	got, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		t.Fatalf("marshaling result: %v", err)
+	}
+
+	goldenPath := filepath.Join("testdata", "jammjar.json")
+
+	if os.Getenv("UPDATE_GOLDEN") != "" {
+		if err := os.WriteFile(goldenPath, append(got, '\n'), 0o644); err != nil {
+			t.Fatalf("updating golden file: %v", err)
+		}
+	}
+
+	want, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("reading golden file: %v", err)
+	}
+
+	if string(got)+"\n" != string(want) {
+		t.Errorf("output does not match golden file %s\nRun with UPDATE_GOLDEN=1 to update\n\ngot:\n%s", goldenPath, string(got))
+	}
+}
+
+func TestExtractDialAddress(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"http://localhost:3000", "localhost:3000"},
+		{"http://localhost:8000", "localhost:8000"},
+		{"http://127.0.0.1:9000", "127.0.0.1:9000"},
+		{"https://localhost:8443", "localhost:8443"},
+		{"http://localhost", "localhost:80"},
+		{"https://localhost", "localhost:443"},
+		{"http://0.0.0.0:5000", "0.0.0.0:5000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := extractDialAddress(tt.input)
+			if got != tt.want {
+				t.Errorf("extractDialAddress(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
