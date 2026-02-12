@@ -10,35 +10,43 @@ import (
 
 // Translate converts a Hatch config into a full Caddy JSON configuration.
 // It skips disabled projects and returns a map suitable for JSON marshaling.
-func Translate(cfg config.Config) map[string]any {
+// When rootCACert and rootCAKey are non-empty, a PKI app is added so Caddy
+// uses the provided root CA for issuing leaf certificates.
+func Translate(cfg config.Config, rootCACert, rootCAKey string) map[string]any {
 	httpsRoutes := buildRoutes(cfg)
 	httpRedirectRoutes := buildHTTPRedirectRoutes(cfg)
-	tlsConfig := buildTLSConfig(cfg)
+	tlsConfig := buildTLSConfig(cfg, rootCACert)
 
 	httpsPort := fmt.Sprintf(":%d", cfg.Settings.HTTPSPort)
 	httpPort := fmt.Sprintf(":%d", cfg.Settings.HTTPPort)
+
+	apps := map[string]any{
+		"http": map[string]any{
+			"servers": map[string]any{
+				"hatch_https": map[string]any{
+					"listen":                 []string{httpsPort},
+					"routes":                 httpsRoutes,
+					"tls_connection_policies": []map[string]any{{}},
+					"automatic_https":         map[string]any{},
+				},
+				"hatch_http": map[string]any{
+					"listen": []string{httpPort},
+					"routes": httpRedirectRoutes,
+				},
+			},
+		},
+		"tls": tlsConfig,
+	}
+
+	if rootCACert != "" {
+		apps["pki"] = buildPKIConfig(rootCACert, rootCAKey)
+	}
 
 	return map[string]any{
 		"admin": map[string]any{
 			"listen": DefaultAdminAddr,
 		},
-		"apps": map[string]any{
-			"http": map[string]any{
-				"servers": map[string]any{
-					"hatch_https": map[string]any{
-						"listen":                  []string{httpsPort},
-						"routes":                  httpsRoutes,
-						"tls_connection_policies":  []map[string]any{{}},
-						"automatic_https":          map[string]any{},
-					},
-					"hatch_http": map[string]any{
-						"listen": []string{httpPort},
-						"routes": httpRedirectRoutes,
-					},
-				},
-			},
-			"tls": tlsConfig,
-		},
+		"apps": apps,
 	}
 }
 
@@ -175,22 +183,42 @@ func buildHTTPRedirectRoutes(cfg config.Config) []map[string]any {
 
 // buildTLSConfig builds the TLS automation config with internal issuer.
 // It adds *.domain wildcards only for projects that use subdomains.
-func buildTLSConfig(cfg config.Config) map[string]any {
+// When rootCACert is non-empty, the issuer references the "hatch" CA.
+func buildTLSConfig(cfg config.Config, rootCACert string) map[string]any {
 	domains := collectDomains(cfg)
+
+	issuer := map[string]any{"module": "internal"}
+	if rootCACert != "" {
+		issuer["ca"] = "hatch"
+	}
 
 	policies := make([]map[string]any, 0)
 	if len(domains) > 0 {
 		policies = append(policies, map[string]any{
 			"subjects": domains,
-			"issuers": []map[string]any{
-				{"module": "internal"},
-			},
+			"issuers":  []map[string]any{issuer},
 		})
 	}
 
 	return map[string]any{
 		"automation": map[string]any{
 			"policies": policies,
+		},
+	}
+}
+
+// buildPKIConfig returns the Caddy PKI app configuration that registers
+// a "hatch" certificate authority backed by the given root CA files.
+func buildPKIConfig(rootCACert, rootCAKey string) map[string]any {
+	return map[string]any{
+		"certificate_authorities": map[string]any{
+			"hatch": map[string]any{
+				"name": "Hatch Local CA",
+				"root": map[string]any{
+					"certificate": rootCACert,
+					"private_key": rootCAKey,
+				},
+			},
 		},
 	}
 }
