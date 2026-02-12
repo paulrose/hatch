@@ -8,9 +8,9 @@ settings:
   log_level: info
 
 projects:
-  jammjar:
-    domain: jammjar.test
-    path: /Users/paul/Projects/jammjar
+  acme:
+    domain: acme.test
+    path: /home/user/projects/acme
     enabled: true
     services:
       web:

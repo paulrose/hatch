@@ -9,8 +9,8 @@ import (
 	"github.com/paulrose/hatch/internal/config"
 )
 
-// jammjarConfig returns the full jammjar example config used in golden file tests.
-func jammjarConfig() config.Config {
+// fullConfig returns a multi-service example config used in golden file tests.
+func fullConfig() config.Config {
 	return config.Config{
 		Version: 1,
 		Settings: config.Settings{
@@ -21,9 +21,9 @@ func jammjarConfig() config.Config {
 			LogLevel:  "info",
 		},
 		Projects: map[string]config.Project{
-			"jammjar": {
-				Domain:  "jammjar.test",
-				Path:    "/path/to/jammjar",
+			"acme": {
+				Domain:  "acme.test",
+				Path:    "/home/user/projects/acme",
 				Enabled: true,
 				Services: map[string]config.Service{
 					"web": {Proxy: "http://localhost:3000"},
@@ -54,7 +54,7 @@ func TestTranslate_SingleService(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg)
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	httpsServer := servers["hatch_https"].(map[string]any)
@@ -104,7 +104,7 @@ func TestTranslate_PathRouting(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg)
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -142,7 +142,7 @@ func TestTranslate_SubdomainRouting(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg)
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -177,7 +177,7 @@ func TestTranslate_WebSocket(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg)
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -212,8 +212,8 @@ func TestTranslate_WebSocket(t *testing.T) {
 }
 
 func TestTranslate_RouteOrdering(t *testing.T) {
-	cfg := jammjarConfig()
-	result := Translate(cfg)
+	cfg := fullConfig()
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -222,28 +222,28 @@ func TestTranslate_RouteOrdering(t *testing.T) {
 		t.Fatalf("expected 3 routes, got %d", len(routes))
 	}
 
-	// Route 0: subdomain (ws.jammjar.test)
+	// Route 0: subdomain (ws.acme.test)
 	host0 := routes[0]["match"].([]map[string]any)[0]["host"].([]string)[0]
-	if host0 != "ws.jammjar.test" {
-		t.Errorf("route 0: expected ws.jammjar.test, got %s", host0)
+	if host0 != "ws.acme.test" {
+		t.Errorf("route 0: expected ws.acme.test, got %s", host0)
 	}
 
 	// Route 1: path (/api/*)
 	match1 := routes[1]["match"].([]map[string]any)[0]
 	host1 := match1["host"].([]string)[0]
 	path1 := match1["path"].([]string)[0]
-	if host1 != "jammjar.test" {
-		t.Errorf("route 1: expected jammjar.test, got %s", host1)
+	if host1 != "acme.test" {
+		t.Errorf("route 1: expected acme.test, got %s", host1)
 	}
 	if path1 != "/api/*" {
 		t.Errorf("route 1: expected /api/*, got %s", path1)
 	}
 
-	// Route 2: catch-all (jammjar.test)
+	// Route 2: catch-all (acme.test)
 	match2 := routes[2]["match"].([]map[string]any)[0]
 	host2 := match2["host"].([]string)[0]
-	if host2 != "jammjar.test" {
-		t.Errorf("route 2: expected jammjar.test, got %s", host2)
+	if host2 != "acme.test" {
+		t.Errorf("route 2: expected acme.test, got %s", host2)
 	}
 	if _, hasPath := match2["path"]; hasPath {
 		t.Error("route 2: catch-all should not have path matcher")
@@ -269,7 +269,7 @@ func TestTranslate_DisabledSkipped(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg)
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -306,7 +306,7 @@ func TestTranslate_MultipleProjects(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg)
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -327,8 +327,8 @@ func TestTranslate_MultipleProjects(t *testing.T) {
 }
 
 func TestTranslate_HTTPRedirects(t *testing.T) {
-	cfg := jammjarConfig()
-	result := Translate(cfg)
+	cfg := fullConfig()
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	httpServer := servers["hatch_http"].(map[string]any)
@@ -345,11 +345,11 @@ func TestTranslate_HTTPRedirects(t *testing.T) {
 	if len(hosts) != 2 {
 		t.Fatalf("expected 2 hosts in redirect, got %d", len(hosts))
 	}
-	if hosts[0] != "*.jammjar.test" {
-		t.Errorf("expected *.jammjar.test, got %s", hosts[0])
+	if hosts[0] != "*.acme.test" {
+		t.Errorf("expected *.acme.test, got %s", hosts[0])
 	}
-	if hosts[1] != "jammjar.test" {
-		t.Errorf("expected jammjar.test, got %s", hosts[1])
+	if hosts[1] != "acme.test" {
+		t.Errorf("expected acme.test, got %s", hosts[1])
 	}
 
 	handler := routes[0]["handle"].([]map[string]any)[0]
@@ -362,8 +362,8 @@ func TestTranslate_HTTPRedirects(t *testing.T) {
 }
 
 func TestTranslate_TLSAutomation(t *testing.T) {
-	cfg := jammjarConfig()
-	result := Translate(cfg)
+	cfg := fullConfig()
+	result := Translate(cfg, "", "")
 
 	tls := result["apps"].(map[string]any)["tls"].(map[string]any)
 	automation := tls["automation"].(map[string]any)
@@ -377,11 +377,11 @@ func TestTranslate_TLSAutomation(t *testing.T) {
 	if len(subjects) != 2 {
 		t.Fatalf("expected 2 TLS subjects, got %d", len(subjects))
 	}
-	if subjects[0] != "*.jammjar.test" {
-		t.Errorf("expected *.jammjar.test, got %s", subjects[0])
+	if subjects[0] != "*.acme.test" {
+		t.Errorf("expected *.acme.test, got %s", subjects[0])
 	}
-	if subjects[1] != "jammjar.test" {
-		t.Errorf("expected jammjar.test, got %s", subjects[1])
+	if subjects[1] != "acme.test" {
+		t.Errorf("expected acme.test, got %s", subjects[1])
 	}
 
 	issuers := policies[0]["issuers"].([]map[string]any)
@@ -400,7 +400,7 @@ func TestTranslate_CustomPorts(t *testing.T) {
 		Projects: map[string]config.Project{},
 	}
 
-	result := Translate(cfg)
+	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 
@@ -425,7 +425,7 @@ func TestTranslate_EmptyConfig(t *testing.T) {
 		Projects: map[string]config.Project{},
 	}
 
-	result := Translate(cfg)
+	result := Translate(cfg, "", "")
 
 	// Should still produce valid structure.
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
@@ -447,16 +447,109 @@ func TestTranslate_EmptyConfig(t *testing.T) {
 	}
 }
 
+func TestTranslate_PKIConfig(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"myapp": {
+				Domain:  "myapp.test",
+				Path:    "/path/to/myapp",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"web": {Proxy: "http://localhost:3000"},
+				},
+			},
+		},
+	}
+
+	certPath := "/home/user/.hatch/certs/rootCA.pem"
+	keyPath := "/home/user/.hatch/certs/rootCA-key.pem"
+
+	result := Translate(cfg, certPath, keyPath)
+
+	apps := result["apps"].(map[string]any)
+
+	// PKI app should be present.
+	pki, ok := apps["pki"].(map[string]any)
+	if !ok {
+		t.Fatal("expected pki app to be present")
+	}
+	cas := pki["certificate_authorities"].(map[string]any)
+	hatchCA := cas["hatch"].(map[string]any)
+	if hatchCA["name"] != "Hatch Local CA" {
+		t.Errorf("expected CA name 'Hatch Local CA', got %s", hatchCA["name"])
+	}
+	root := hatchCA["root"].(map[string]any)
+	if root["certificate"] != certPath {
+		t.Errorf("expected certificate %s, got %s", certPath, root["certificate"])
+	}
+	if root["private_key"] != keyPath {
+		t.Errorf("expected private_key %s, got %s", keyPath, root["private_key"])
+	}
+
+	// TLS issuer should reference "hatch" CA.
+	tls := apps["tls"].(map[string]any)
+	policies := tls["automation"].(map[string]any)["policies"].([]map[string]any)
+	issuers := policies[0]["issuers"].([]map[string]any)
+	if issuers[0]["module"] != "internal" {
+		t.Errorf("expected internal issuer module, got %s", issuers[0]["module"])
+	}
+	if issuers[0]["ca"] != "hatch" {
+		t.Errorf("expected ca 'hatch', got %v", issuers[0]["ca"])
+	}
+}
+
+func TestTranslate_PKIConfig_NoPKIWhenEmpty(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"myapp": {
+				Domain:  "myapp.test",
+				Path:    "/path/to/myapp",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"web": {Proxy: "http://localhost:3000"},
+				},
+			},
+		},
+	}
+
+	result := Translate(cfg, "", "")
+
+	apps := result["apps"].(map[string]any)
+
+	// PKI app should NOT be present.
+	if _, ok := apps["pki"]; ok {
+		t.Error("expected no pki app when CA paths are empty")
+	}
+
+	// TLS issuer should NOT have "ca" field.
+	tls := apps["tls"].(map[string]any)
+	policies := tls["automation"].(map[string]any)["policies"].([]map[string]any)
+	issuers := policies[0]["issuers"].([]map[string]any)
+	if _, ok := issuers[0]["ca"]; ok {
+		t.Error("expected no 'ca' field in issuer when CA paths are empty")
+	}
+}
+
 func TestTranslate_GoldenFile(t *testing.T) {
-	cfg := jammjarConfig()
-	result := Translate(cfg)
+	cfg := fullConfig()
+	result := Translate(cfg, "", "")
 
 	got, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		t.Fatalf("marshaling result: %v", err)
 	}
 
-	goldenPath := filepath.Join("testdata", "jammjar.json")
+	goldenPath := filepath.Join("testdata", "full.json")
 
 	if os.Getenv("UPDATE_GOLDEN") != "" {
 		if err := os.WriteFile(goldenPath, append(got, '\n'), 0o644); err != nil {

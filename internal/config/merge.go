@@ -3,7 +3,7 @@ package config
 import "fmt"
 
 // MergeProjectConfig adds or updates a project in the config from a ProjectConfig.
-// The name is the project key (e.g. "jammjar"), and projectPath is the filesystem path.
+// The name is the project key (e.g. "myapp"), and projectPath is the filesystem path.
 func MergeProjectConfig(cfg *Config, name string, projectPath string, pc ProjectConfig) error {
 	// Check for domain conflicts with other projects
 	for existingName, existingProj := range cfg.Projects {

@@ -25,8 +25,8 @@
               "match": [
                 {
                   "host": [
-                    "*.jammjar.test",
-                    "jammjar.test"
+                    "*.acme.test",
+                    "acme.test"
                   ]
                 }
               ]
@@ -66,7 +66,7 @@
               "match": [
                 {
                   "host": [
-                    "ws.jammjar.test"
+                    "ws.acme.test"
                   ]
                 }
               ],
@@ -86,7 +86,7 @@
               "match": [
                 {
                   "host": [
-                    "jammjar.test"
+                    "acme.test"
                   ],
                   "path": [
                     "/api/*"
@@ -109,7 +109,7 @@
               "match": [
                 {
                   "host": [
-                    "jammjar.test"
+                    "acme.test"
                   ]
                 }
               ],
@@ -132,8 +132,8 @@
               }
             ],
             "subjects": [
-              "*.jammjar.test",
-              "jammjar.test"
+              "*.acme.test",
+              "acme.test"
             ]
           }
         ]
