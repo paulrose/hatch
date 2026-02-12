@@ -9,8 +9,8 @@ import (
 	"github.com/paulrose/hatch/internal/config"
 )
 
-// jammjarConfig returns the full jammjar example config used in golden file tests.
-func jammjarConfig() config.Config {
+// fullConfig returns a multi-service example config used in golden file tests.
+func fullConfig() config.Config {
 	return config.Config{
 		Version: 1,
 		Settings: config.Settings{
@@ -21,9 +21,9 @@ func jammjarConfig() config.Config {
 			LogLevel:  "info",
 		},
 		Projects: map[string]config.Project{
-			"jammjar": {
-				Domain:  "jammjar.test",
-				Path:    "/path/to/jammjar",
+			"acme": {
+				Domain:  "acme.test",
+				Path:    "/home/user/projects/acme",
 				Enabled: true,
 				Services: map[string]config.Service{
 					"web": {Proxy: "http://localhost:3000"},
@@ -212,7 +212,7 @@ func TestTranslate_WebSocket(t *testing.T) {
 }
 
 func TestTranslate_RouteOrdering(t *testing.T) {
-	cfg := jammjarConfig()
+	cfg := fullConfig()
 	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
@@ -222,28 +222,28 @@ func TestTranslate_RouteOrdering(t *testing.T) {
 		t.Fatalf("expected 3 routes, got %d", len(routes))
 	}
 
-	// Route 0: subdomain (ws.jammjar.test)
+	// Route 0: subdomain (ws.acme.test)
 	host0 := routes[0]["match"].([]map[string]any)[0]["host"].([]string)[0]
-	if host0 != "ws.jammjar.test" {
-		t.Errorf("route 0: expected ws.jammjar.test, got %s", host0)
+	if host0 != "ws.acme.test" {
+		t.Errorf("route 0: expected ws.acme.test, got %s", host0)
 	}
 
 	// Route 1: path (/api/*)
 	match1 := routes[1]["match"].([]map[string]any)[0]
 	host1 := match1["host"].([]string)[0]
 	path1 := match1["path"].([]string)[0]
-	if host1 != "jammjar.test" {
-		t.Errorf("route 1: expected jammjar.test, got %s", host1)
+	if host1 != "acme.test" {
+		t.Errorf("route 1: expected acme.test, got %s", host1)
 	}
 	if path1 != "/api/*" {
 		t.Errorf("route 1: expected /api/*, got %s", path1)
 	}
 
-	// Route 2: catch-all (jammjar.test)
+	// Route 2: catch-all (acme.test)
 	match2 := routes[2]["match"].([]map[string]any)[0]
 	host2 := match2["host"].([]string)[0]
-	if host2 != "jammjar.test" {
-		t.Errorf("route 2: expected jammjar.test, got %s", host2)
+	if host2 != "acme.test" {
+		t.Errorf("route 2: expected acme.test, got %s", host2)
 	}
 	if _, hasPath := match2["path"]; hasPath {
 		t.Error("route 2: catch-all should not have path matcher")
@@ -327,7 +327,7 @@ func TestTranslate_MultipleProjects(t *testing.T) {
 }
 
 func TestTranslate_HTTPRedirects(t *testing.T) {
-	cfg := jammjarConfig()
+	cfg := fullConfig()
 	result := Translate(cfg, "", "")
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
@@ -345,11 +345,11 @@ func TestTranslate_HTTPRedirects(t *testing.T) {
 	if len(hosts) != 2 {
 		t.Fatalf("expected 2 hosts in redirect, got %d", len(hosts))
 	}
-	if hosts[0] != "*.jammjar.test" {
-		t.Errorf("expected *.jammjar.test, got %s", hosts[0])
+	if hosts[0] != "*.acme.test" {
+		t.Errorf("expected *.acme.test, got %s", hosts[0])
 	}
-	if hosts[1] != "jammjar.test" {
-		t.Errorf("expected jammjar.test, got %s", hosts[1])
+	if hosts[1] != "acme.test" {
+		t.Errorf("expected acme.test, got %s", hosts[1])
 	}
 
 	handler := routes[0]["handle"].([]map[string]any)[0]
@@ -362,7 +362,7 @@ func TestTranslate_HTTPRedirects(t *testing.T) {
 }
 
 func TestTranslate_TLSAutomation(t *testing.T) {
-	cfg := jammjarConfig()
+	cfg := fullConfig()
 	result := Translate(cfg, "", "")
 
 	tls := result["apps"].(map[string]any)["tls"].(map[string]any)
@@ -377,11 +377,11 @@ func TestTranslate_TLSAutomation(t *testing.T) {
 	if len(subjects) != 2 {
 		t.Fatalf("expected 2 TLS subjects, got %d", len(subjects))
 	}
-	if subjects[0] != "*.jammjar.test" {
-		t.Errorf("expected *.jammjar.test, got %s", subjects[0])
+	if subjects[0] != "*.acme.test" {
+		t.Errorf("expected *.acme.test, got %s", subjects[0])
 	}
-	if subjects[1] != "jammjar.test" {
-		t.Errorf("expected jammjar.test, got %s", subjects[1])
+	if subjects[1] != "acme.test" {
+		t.Errorf("expected acme.test, got %s", subjects[1])
 	}
 
 	issuers := policies[0]["issuers"].([]map[string]any)
@@ -541,7 +541,7 @@ func TestTranslate_PKIConfig_NoPKIWhenEmpty(t *testing.T) {
 }
 
 func TestTranslate_GoldenFile(t *testing.T) {
-	cfg := jammjarConfig()
+	cfg := fullConfig()
 	result := Translate(cfg, "", "")
 
 	got, err := json.MarshalIndent(result, "", "  ")
@@ -549,7 +549,7 @@ func TestTranslate_GoldenFile(t *testing.T) {
 		t.Fatalf("marshaling result: %v", err)
 	}
 
-	goldenPath := filepath.Join("testdata", "jammjar.json")
+	goldenPath := filepath.Join("testdata", "full.json")
 
 	if os.Getenv("UPDATE_GOLDEN") != "" {
 		if err := os.WriteFile(goldenPath, append(got, '\n'), 0o644); err != nil {
