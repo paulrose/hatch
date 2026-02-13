@@ -26,7 +26,6 @@ func init() {
 
 func runInit(cmd *cobra.Command, args []string) error {
 	green := color.New(color.FgGreen).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 	cyan := color.New(color.FgCyan, color.Bold).SprintFunc()
 
@@ -103,16 +102,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if certs.IsCATrusted(caPaths.Cert) {
 		fmt.Printf("  %s Root CA already trusted\n", green("✓"))
 	} else {
-		// Try osascript first; fall back to sudo if it fails (macOS can
-		// block the Keychain authorization dialog inside osascript).
-		var trustErr error
-		trustErr = certs.TrustCA(&certs.OSAScriptRunner{}, caPaths.Cert)
-		if trustErr != nil {
-			fmt.Printf("  %s osascript trust failed, trying sudo...\n", yellow("!"))
-			trustErr = certs.TrustCA(&sudoRunner{}, caPaths.Cert)
-		}
-		if trustErr != nil {
-			fmt.Printf("  %s Failed to trust root CA: %v\n", red("✗"), trustErr)
+		if err := certs.TrustCA(&sudoRunner{}, caPaths.Cert); err != nil {
+			fmt.Printf("  %s Failed to trust root CA: %v\n", red("✗"), err)
 			os.Exit(1)
 		}
 		fmt.Printf("  %s Root CA trusted in Keychain\n", green("✓"))
@@ -124,8 +115,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if dns.IsResolverInstalled(tld) {
 		fmt.Printf("  %s DNS resolver already installed\n", green("✓"))
 	} else {
-		runner := &dns.OSAScriptRunner{}
-		if err := dns.InstallResolverFile(runner, tld, dns.DefaultListenIP, dns.DefaultPort); err != nil {
+		if err := dns.InstallResolverFile(&sudoRunner{}, tld, dns.DefaultListenIP, dns.DefaultPort); err != nil {
 			fmt.Printf("  %s Failed to install DNS resolver: %v\n", red("✗"), err)
 			os.Exit(1)
 		}
