@@ -20,8 +20,9 @@ type PKIPaths struct {
 // Translate converts a Hatch config into a full Caddy JSON configuration.
 // It skips disabled projects and returns a map suitable for JSON marshaling.
 // When pki.RootCert is non-empty, a PKI app is added so Caddy uses the
-// provided CA for issuing leaf certificates.
-func Translate(cfg config.Config, pki PKIPaths) map[string]any {
+// provided CA for issuing leaf certificates. dataDir controls where Caddy
+// stores certificates and PKI data.
+func Translate(cfg config.Config, pki PKIPaths, dataDir string) map[string]any {
 	httpsRoutes := buildRoutes(cfg)
 	httpRedirectRoutes := buildHTTPRedirectRoutes(cfg)
 	tlsConfig := buildTLSConfig(cfg, pki.RootCert)
@@ -62,6 +63,10 @@ func Translate(cfg config.Config, pki PKIPaths) map[string]any {
 		},
 		"apps":    apps,
 		"logging": buildLoggingConfig(),
+		"storage": map[string]any{
+			"module": "file_system",
+			"root":   dataDir,
+		},
 	}
 }
 

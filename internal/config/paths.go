@@ -51,3 +51,8 @@ func LogsDir() string {
 func LogFile() string {
 	return filepath.Join(LogsDir(), "hatch.log")
 }
+
+// CaddyDir returns the path to the isolated Caddy data directory.
+func CaddyDir() string {
+	return filepath.Join(Dir(), "caddy")
+}

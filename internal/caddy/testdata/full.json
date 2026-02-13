@@ -162,5 +162,9 @@
         }
       }
     }
+  },
+  "storage": {
+    "module": "file_system",
+    "root": "/test/data/caddy"
   }
 }

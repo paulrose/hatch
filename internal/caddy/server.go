@@ -42,6 +42,11 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.mu.Unlock()
 
+	// Redirect Caddy's data directory to ~/.hatch/caddy/ before first use.
+	if err := ConfigureDataDir(); err != nil {
+		return fmt.Errorf("configuring caddy data dir: %w", err)
+	}
+
 	if err := caddyv2.Run(&caddyv2.Config{
 		Admin: &caddyv2.AdminConfig{
 			Listen: s.cfg.AdminAddr,
