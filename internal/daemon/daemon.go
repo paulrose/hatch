@@ -115,7 +115,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		RootKey:          d.caPaths.Key,
 		IntermediateCert: d.caPaths.IntermediateCert,
 		IntermediateKey:  d.caPaths.IntermediateKey,
-	})
+	}, caddy.DataDir())
 	if err := caddySrv.LoadConfig(ctx, caddyCfg); err != nil {
 		d.shutdownPartial()
 		return fmt.Errorf("load caddy config: %w", err)
@@ -229,7 +229,7 @@ func (d *Daemon) onConfigReload(cfg config.Config) {
 		RootKey:          d.caPaths.Key,
 		IntermediateCert: d.caPaths.IntermediateCert,
 		IntermediateKey:  d.caPaths.IntermediateKey,
-	})
+	}, caddy.DataDir())
 	if err := d.caddy.LoadConfig(context.Background(), caddyCfg); err != nil {
 		log.Error().Err(err).Msg("failed to reload caddy config")
 		return

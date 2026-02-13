@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	caddyv2 "github.com/caddyserver/caddy/v2"
+	"github.com/paulrose/hatch/internal/config"
 )
 
 // DefaultAdminAddr is the default Caddy admin API listen address.
@@ -18,16 +18,25 @@ type ServerConfig struct {
 	AdminAddr string // e.g. "localhost:2019"
 }
 
-// DataDir returns Caddy's application data directory.
+// DataDir returns Caddy's isolated data directory under ~/.hatch/caddy/.
 func DataDir() string {
-	return caddyv2.AppDataDir()
+	return config.CaddyDir()
+}
+
+// ConfigureDataDir sets XDG_DATA_HOME so that Caddy's internal AppDataDir()
+// resolves to ~/.hatch/caddy/ instead of ~/Library/Application Support/Caddy/.
+// This is needed in addition to the storage.root JSON config because Caddy's
+// PKI module stores authorities under AppDataDir(), not under storage.root.
+// Must be called before caddyv2.Run() and before any concurrent goroutines.
+func ConfigureDataDir() error {
+	return os.Setenv("XDG_DATA_HOME", config.Dir())
 }
 
 // ClearPKICache removes Caddy's cached PKI authority and issued certificates
 // for the "hatch" CA. This forces Caddy to use the intermediate CA we provide
 // in the PKI config and re-issue leaf certificates signed by it.
 func ClearPKICache() error {
-	dataDir := caddyv2.AppDataDir()
+	dataDir := DataDir()
 	dirs := []string{
 		filepath.Join(dataDir, "pki", "authorities", "hatch"),
 		filepath.Join(dataDir, "certificates", "hatch"),
