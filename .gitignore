@@ -33,3 +33,12 @@ CLAUDE.md
 
 # Testing
 testing/
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/src/wailsjs/
+*.tsbuildinfo
+
+# Wails build
+build/bin/

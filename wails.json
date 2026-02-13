@@ -1,0 +1,10 @@
+{
+  "name": "Hatch",
+  "outputfilename": "hatch",
+  "frontend:dir": "frontend",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "assetdir": "frontend/dist",
+  "wailsjsdir": "frontend/src/wailsjs",
+  "build:dir": "build"
+}

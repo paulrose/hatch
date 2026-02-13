@@ -7,7 +7,7 @@ LDFLAGS := -s -w \
 	-X github.com/paulrose/hatch/cmd.commit=$(COMMIT) \
 	-X github.com/paulrose/hatch/cmd.date=$(DATE)
 
-.PHONY: build build-test run test clean
+.PHONY: build build-test run test clean app frontend
 
 build:
 	go build -ldflags '$(LDFLAGS)' -o hatch .
@@ -20,6 +20,12 @@ run:
 
 test:
 	go test ./...
+
+frontend:
+	cd frontend && npm install && npm run build
+
+app: frontend
+	CGO_LDFLAGS="-framework UniformTypeIdentifiers" go build -tags desktop,production -ldflags '$(LDFLAGS)' -o hatch .
 
 clean:
 	rm -f hatch
