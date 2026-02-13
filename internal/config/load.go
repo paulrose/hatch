@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -17,25 +18,36 @@ func Load() (Config, error) {
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parsing config: %w", err)
+		msgs := FormatYAMLError(err)
+		errs := make([]error, len(msgs))
+		for i, m := range msgs {
+			errs[i] = fmt.Errorf("%s", m)
+		}
+		return Config{}, fmt.Errorf("parsing config: %w", &ValidationErrors{Errs: errs})
 	}
 
 	if errs := Validate(cfg); len(errs) > 0 {
-		return Config{}, fmt.Errorf("invalid config: %w", errs[0])
+		return Config{}, fmt.Errorf("invalid config: %w", &ValidationErrors{Errs: errs})
 	}
 
 	return cfg, nil
 }
 
 // Save atomically writes cfg to ConfigFile().
-// It writes to a temp file then renames, preventing partial reads.
+// It backs up the existing config (if any) to config.yml.bak,
+// then writes to a temp file and renames, preventing partial reads.
 func Save(cfg Config) error {
+	path := ConfigFile()
+
+	if err := backupConfig(path); err != nil {
+		return fmt.Errorf("backing up config: %w", err)
+	}
+
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	path := ConfigFile()
 	tmp := path + ".tmp"
 
 	if err := os.WriteFile(tmp, data, 0644); err != nil {
@@ -48,6 +60,32 @@ func Save(cfg Config) error {
 	}
 
 	return nil
+}
+
+// backupConfig copies the existing config file to path.bak.
+// It is a no-op if the source file does not exist.
+func backupConfig(path string) error {
+	src, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer src.Close()
+
+	bakPath := path + ".bak"
+	dst, err := os.OpenFile(bakPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		os.Remove(bakPath)
+		return err
+	}
+	return dst.Close()
 }
 
 // LoadProjectConfig reads a per-project .hatch.yml file.

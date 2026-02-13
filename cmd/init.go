@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -62,7 +63,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Load config to get TLD for later steps
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Printf("  %s Failed to load config: %v\n", red("✗"), err)
+		var ve *config.ValidationErrors
+		if errors.As(err, &ve) {
+			for i, e := range ve.Errs {
+				fmt.Printf("  %s Config error %d: %s\n", red("✗"), i+1, e)
+			}
+		} else {
+			fmt.Printf("  %s Failed to load config: %v\n", red("✗"), err)
+		}
 		os.Exit(1)
 	}
 

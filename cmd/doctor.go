@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -55,7 +56,15 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 1: Config file valid
 	cfg, err := config.Load()
 	if err != nil {
-		fail(fmt.Sprintf("Config file is invalid: %v", err), "Fix the errors in ~/.hatch/config.yml or run 'hatch init'")
+		var ve *config.ValidationErrors
+		if errors.As(err, &ve) {
+			for i, e := range ve.Errs {
+				fail(fmt.Sprintf("Config error %d: %s", i+1, e), "")
+			}
+			fmt.Printf("    %s Fix the errors in ~/.hatch/config.yml or run 'hatch init'\n", yellow("→"))
+		} else {
+			fail(fmt.Sprintf("Config file is invalid: %v", err), "Fix the errors in ~/.hatch/config.yml or run 'hatch init'")
+		}
 		// Without valid config, skip downstream checks that need it.
 		total += 8
 		fmt.Println()
@@ -133,12 +142,14 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		if checkPortAvailable(httpPort) {
 			pass(fmt.Sprintf("HTTP port :%d is available", httpPort))
 		} else {
-			fail(fmt.Sprintf("HTTP port :%d is in use", httpPort), "Another process is using this port")
+			hint := portConflictHint(httpPort)
+			fail(fmt.Sprintf("HTTP port :%d is in use", httpPort), hint)
 		}
 		if checkPortAvailable(httpsPort) {
 			pass(fmt.Sprintf("HTTPS port :%d is available", httpsPort))
 		} else {
-			fail(fmt.Sprintf("HTTPS port :%d is in use", httpsPort), "Another process is using this port")
+			hint := portConflictHint(httpsPort)
+			fail(fmt.Sprintf("HTTPS port :%d is in use", httpsPort), hint)
 		}
 	}
 
@@ -179,6 +190,14 @@ func checkDaemonListening(port int) bool {
 	}
 	conn.Close()
 	return true
+}
+
+func portConflictHint(port int) string {
+	info, err := daemon.CheckPort(port)
+	if err != nil || info == nil {
+		return "Another process is using this port"
+	}
+	return fmt.Sprintf("In use by %s", info)
 }
 
 func findStaleProjects(projects map[string]config.Project) []string {
