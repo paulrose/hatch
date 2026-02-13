@@ -33,3 +33,8 @@ func ConfigFile() string {
 func CertsDir() string {
 	return filepath.Join(Dir(), certsDirName)
 }
+
+// LogFile returns the path to the daemon log file.
+func LogFile() string {
+	return filepath.Join(Dir(), "daemon.log")
+}
