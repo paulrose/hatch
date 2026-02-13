@@ -15,10 +15,11 @@ import (
 )
 
 var cleanCmd = &cobra.Command{
-	Use:   "clean",
-	Short: "Remove all Hatch configuration and system integrations",
-	Long:  `Stops the daemon, removes the DNS resolver, untrusts the root CA, and deletes the ~/.hatch directory.`,
-	RunE:  runClean,
+	Use:     "clean",
+	Aliases: []string{"uninstall"},
+	Short:   "Remove all Hatch configuration and system integrations",
+	Long:    `Stops the daemon, removes the DNS resolver, untrusts the root CA, and deletes the ~/.hatch directory.`,
+	RunE:    runClean,
 }
 
 func init() {
