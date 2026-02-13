@@ -7,6 +7,8 @@ import (
 )
 
 func main() {
+	cmd.SetAssets(assets)
+
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
