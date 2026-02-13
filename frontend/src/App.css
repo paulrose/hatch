@@ -1,9 +1,23 @@
+@font-face {
+  font-family: "Fugaz One";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/FugazOne-Regular.woff2") format("woff2");
+}
+
 :root {
+  --honey-bronze: #f6bd60;
+  --linen: #f7ede2;
+  --cotton-rose: #f5cac3;
+  --muted-teal: #84a59d;
+  --light-coral: #f28482;
+
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
-  color: #213547;
-  background-color: #ffffff;
+  color: #3d3d3d;
+  background-color: var(--linen);
 }
 
 body {
@@ -25,18 +39,26 @@ body {
 }
 
 .app h1 {
-  font-size: 2.5rem;
+  font-family: "Fugaz One", cursive;
+  font-size: 3rem;
+  color: var(--muted-teal);
   margin-bottom: 0.25rem;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
 }
 
 .version {
-  color: #10b981;
-  font-size: 1.1rem;
+  display: inline-block;
+  background-color: var(--honey-bronze);
+  color: #3d3d3d;
+  font-size: 0.85rem;
   font-weight: 600;
-  margin: 0.25rem 0 1rem;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  margin: 0.5rem 0 1.25rem;
 }
 
 .subtitle {
-  color: #6b7280;
+  color: var(--muted-teal);
   font-size: 1rem;
 }
