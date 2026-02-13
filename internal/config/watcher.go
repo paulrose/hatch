@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"path/filepath"
 	"sync"
 	"time"
@@ -73,7 +74,15 @@ func (w *Watcher) loop() {
 			timer = time.AfterFunc(debounceDuration, func() {
 				cfg, err := Load()
 				if err != nil {
-					log.Warn().Err(err).Msg("config reload skipped")
+					var ve *ValidationErrors
+					if errors.As(err, &ve) {
+						log.Warn().Int("count", len(ve.Errs)).Msg("config reload skipped due to validation errors")
+						for _, e := range ve.Errs {
+							log.Warn().Msgf("  - %s", e)
+						}
+					} else {
+						log.Warn().Err(err).Msg("config reload skipped")
+					}
 					return
 				}
 				log.Info().Msg("config reloaded")

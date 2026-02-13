@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -147,6 +149,92 @@ func TestLoadProjectConfig_NoServices(t *testing.T) {
 	_, err := LoadProjectConfig(path)
 	if err == nil {
 		t.Fatal("expected error for empty services")
+	}
+}
+
+func TestSave_BackupFirstSave(t *testing.T) {
+	home := setupTestHome(t)
+	if err := EnsureConfigDir(); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := DefaultConfig()
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	// No .bak should exist on first save (no prior file to back up).
+	bak := filepath.Join(home, configFileName+".bak")
+	if _, err := os.Stat(bak); !os.IsNotExist(err) {
+		t.Error(".bak file should not exist after first save")
+	}
+}
+
+func TestSave_BackupContainsPreviousContent(t *testing.T) {
+	home := setupTestHome(t)
+	if err := EnsureConfigDir(); err != nil {
+		t.Fatal(err)
+	}
+
+	// First save.
+	cfg := DefaultConfig()
+	if err := Save(cfg); err != nil {
+		t.Fatalf("first Save: %v", err)
+	}
+
+	// Read first save content.
+	firstContent, err := os.ReadFile(filepath.Join(home, configFileName))
+	if err != nil {
+		t.Fatalf("read first config: %v", err)
+	}
+
+	// Second save with a change.
+	cfg.Settings.LogLevel = "debug"
+	if err := Save(cfg); err != nil {
+		t.Fatalf("second Save: %v", err)
+	}
+
+	// .bak should contain the first save's content.
+	bakContent, err := os.ReadFile(filepath.Join(home, configFileName+".bak"))
+	if err != nil {
+		t.Fatalf("read .bak: %v", err)
+	}
+	if string(bakContent) != string(firstContent) {
+		t.Errorf(".bak content mismatch:\ngot:  %s\nwant: %s", bakContent, firstContent)
+	}
+}
+
+func TestLoad_MultipleValidationErrors(t *testing.T) {
+	home := setupTestHome(t)
+	if err := EnsureConfigDir(); err != nil {
+		t.Fatal(err)
+	}
+	// Version 0 and invalid TLD — should produce multiple errors.
+	data := "version: 0\nsettings:\n  tld: invalid\n  http_port: 80\n  https_port: 443\n  log_level: info\nprojects: {}\n"
+	if err := os.WriteFile(filepath.Join(home, configFileName), []byte(data), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+
+	var ve *ValidationErrors
+	if !errors.As(err, &ve) {
+		t.Fatalf("expected *ValidationErrors, got %T: %v", err, err)
+	}
+	if len(ve.Errs) < 2 {
+		t.Errorf("expected at least 2 errors, got %d", len(ve.Errs))
+	}
+
+	// Error message should contain both issues.
+	msg := err.Error()
+	if !strings.Contains(msg, "version") {
+		t.Errorf("expected version error in message, got %q", msg)
+	}
+	if !strings.Contains(msg, "tld") {
+		t.Errorf("expected tld error in message, got %q", msg)
 	}
 }
 

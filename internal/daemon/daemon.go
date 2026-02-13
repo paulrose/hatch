@@ -54,6 +54,17 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	d.cfg = cfg
 
+	// Pre-flight: check that required ports are free.
+	for _, port := range []int{cfg.Settings.HTTPPort, cfg.Settings.HTTPSPort} {
+		info, err := CheckPort(port)
+		if err != nil {
+			log.Warn().Err(err).Int("port", port).Msg("could not check port availability")
+		} else if info != nil {
+			RemovePID(d.pidFile)
+			return fmt.Errorf("port conflict: port :%d in use by %s", port, info)
+		}
+	}
+
 	// Resolve CA paths and verify the files exist.
 	d.caPaths = certs.NewCAPaths(config.CertsDir())
 	if !certs.CAExists(d.caPaths) {
