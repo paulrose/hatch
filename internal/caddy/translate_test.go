@@ -341,15 +341,15 @@ func TestTranslate_HTTPRedirects(t *testing.T) {
 	match := routes[0]["match"].([]map[string]any)[0]
 	hosts := match["host"].([]string)
 
-	// Should include base domain and wildcard (sorted).
+	// Should include base domain and subdomain (sorted).
 	if len(hosts) != 2 {
 		t.Fatalf("expected 2 hosts in redirect, got %d", len(hosts))
 	}
-	if hosts[0] != "*.acme.test" {
-		t.Errorf("expected *.acme.test, got %s", hosts[0])
+	if hosts[0] != "acme.test" {
+		t.Errorf("expected acme.test, got %s", hosts[0])
 	}
-	if hosts[1] != "acme.test" {
-		t.Errorf("expected acme.test, got %s", hosts[1])
+	if hosts[1] != "ws.acme.test" {
+		t.Errorf("expected ws.acme.test, got %s", hosts[1])
 	}
 
 	handler := routes[0]["handle"].([]map[string]any)[0]
@@ -377,11 +377,11 @@ func TestTranslate_TLSAutomation(t *testing.T) {
 	if len(subjects) != 2 {
 		t.Fatalf("expected 2 TLS subjects, got %d", len(subjects))
 	}
-	if subjects[0] != "*.acme.test" {
-		t.Errorf("expected *.acme.test, got %s", subjects[0])
+	if subjects[0] != "acme.test" {
+		t.Errorf("expected acme.test, got %s", subjects[0])
 	}
-	if subjects[1] != "acme.test" {
-		t.Errorf("expected acme.test, got %s", subjects[1])
+	if subjects[1] != "ws.acme.test" {
+		t.Errorf("expected ws.acme.test, got %s", subjects[1])
 	}
 
 	issuers := policies[0]["issuers"].([]map[string]any)

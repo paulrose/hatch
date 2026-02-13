@@ -25,8 +25,8 @@
               "match": [
                 {
                   "host": [
-                    "*.acme.test",
-                    "acme.test"
+                    "acme.test",
+                    "ws.acme.test"
                   ]
                 }
               ]
@@ -34,7 +34,9 @@
           ]
         },
         "hatch_https": {
-          "automatic_https": {},
+          "automatic_https": {
+            "disable_redirects": true
+          },
           "listen": [
             ":443"
           ],
@@ -135,8 +137,8 @@
               }
             ],
             "subjects": [
-              "*.acme.test",
-              "acme.test"
+              "acme.test",
+              "ws.acme.test"
             ]
           }
         ]

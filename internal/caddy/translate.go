@@ -27,7 +27,9 @@ func Translate(cfg config.Config, rootCACert, rootCAKey string) map[string]any {
 					"listen":                 []string{httpsPort},
 					"routes":                 httpsRoutes,
 					"tls_connection_policies": []map[string]any{{}},
-					"automatic_https":         map[string]any{},
+					"automatic_https": map[string]any{
+						"disable_redirects": true,
+					},
 					"logs": map[string]any{
 						"default_logger_name": "access",
 					},
@@ -186,7 +188,6 @@ func buildHTTPRedirectRoutes(cfg config.Config) []map[string]any {
 }
 
 // buildTLSConfig builds the TLS automation config with internal issuer.
-// It adds *.domain wildcards only for projects that use subdomains.
 // When rootCACert is non-empty, the issuer references the "hatch" CA.
 func buildTLSConfig(cfg config.Config, rootCACert string) map[string]any {
 	domains := collectDomains(cfg)
@@ -228,7 +229,8 @@ func buildPKIConfig(rootCACert, rootCAKey string) map[string]any {
 }
 
 // collectDomains returns all unique domains across enabled projects, sorted.
-// It adds *.domain wildcards for projects that have subdomain services.
+// Each service's full domain is listed explicitly so that Caddy's automatic
+// HTTPS exact-match check recognises them against the TLS automation policy.
 func collectDomains(cfg config.Config) []string {
 	domainSet := make(map[string]bool)
 
@@ -240,8 +242,7 @@ func collectDomains(cfg config.Config) []string {
 
 		for _, svc := range proj.Services {
 			if svc.Subdomain != "" {
-				domainSet["*."+proj.Domain] = true
-				break
+				domainSet[svc.Subdomain+"."+proj.Domain] = true
 			}
 		}
 	}

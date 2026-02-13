@@ -54,8 +54,12 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	d.cfg = cfg
 
-	// Resolve CA paths.
+	// Resolve CA paths and verify the files exist.
 	d.caPaths = certs.NewCAPaths(config.CertsDir())
+	if !certs.CAExists(d.caPaths) {
+		RemovePID(d.pidFile)
+		return fmt.Errorf("CA files not found at %s — run 'hatch up' to generate", config.CertsDir())
+	}
 
 	// Start DNS server.
 	dnsSrv, err := dns.NewServer(dns.ServerConfig{
