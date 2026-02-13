@@ -38,6 +38,9 @@
           "listen": [
             ":443"
           ],
+          "logs": {
+            "default_logger_name": "access"
+          },
           "routes": [
             {
               "handle": [
@@ -137,6 +140,24 @@
             ]
           }
         ]
+      }
+    }
+  },
+  "logging": {
+    "logs": {
+      "access": {
+        "include": [
+          "http.log.access"
+        ],
+        "writer": {
+          "output": "stderr"
+        }
+      },
+      "default": {
+        "level": "WARN",
+        "writer": {
+          "output": "stderr"
+        }
       }
     }
   }

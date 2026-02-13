@@ -93,7 +93,7 @@ func LoadRaw() (Config, error) {
 
 // EnsureConfigDir creates the config directory and subdirectories.
 func EnsureConfigDir() error {
-	dirs := []string{Dir(), CertsDir()}
+	dirs := []string{Dir(), CertsDir(), LogsDir()}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			return fmt.Errorf("creating directory %s: %w", d, err)
