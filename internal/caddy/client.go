@@ -52,7 +52,7 @@ func (c *Client) Load(ctx context.Context, caddyConfig map[string]any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 10*1024))
 		return fmt.Errorf("caddy rejected config (HTTP %d): %s", resp.StatusCode, string(respBody))
 	}
 

@@ -13,10 +13,17 @@ const (
 )
 
 // Dir returns the Hatch configuration directory.
-// If HATCH_HOME is set, it is used; otherwise defaults to ~/.hatch.
+// If HATCH_HOME is set, it must be an absolute path;
+// otherwise defaults to ~/.hatch.
 func Dir() string {
 	if v := os.Getenv("HATCH_HOME"); v != "" {
-		return v
+		if !filepath.IsAbs(v) {
+			// Resolve relative paths to absolute to prevent traversal.
+			if abs, err := filepath.Abs(v); err == nil {
+				return filepath.Clean(abs)
+			}
+		}
+		return filepath.Clean(v)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -43,7 +44,9 @@ func runConfig() error {
 		editor = "vi"
 	}
 
-	cmd := exec.Command("sh", "-c", editor+" "+path)
+	args := strings.Fields(editor)
+	args = append(args, path)
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
