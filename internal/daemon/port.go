@@ -39,6 +39,8 @@ func CheckPort(port int) (*PortInfo, error) {
 }
 
 // parseLsofOutput extracts process name and PID from lsof output.
+// Only lines containing "(LISTEN)" are considered, since macOS lsof may
+// return outbound connections to the same port without root privileges.
 // Returns nil if no matching line is found.
 func parseLsofOutput(output string, port int) *PortInfo {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
@@ -47,16 +49,21 @@ func parseLsofOutput(output string, port int) *PortInfo {
 	}
 
 	// lsof output columns: COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
-	// Take the first data line (skip header).
-	fields := strings.Fields(lines[1])
-	if len(fields) < 2 {
-		return nil
+	// Find the first data line that is actually a LISTEN socket.
+	for _, line := range lines[1:] {
+		if !strings.Contains(line, "(LISTEN)") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		name := fields[0]
+		pid, err := strconv.Atoi(fields[1])
+		if err != nil {
+			return &PortInfo{Process: name}
+		}
+		return &PortInfo{Process: name, PID: pid}
 	}
-
-	name := fields[0]
-	pid, err := strconv.Atoi(fields[1])
-	if err != nil {
-		return &PortInfo{Process: name}
-	}
-	return &PortInfo{Process: name, PID: pid}
+	return nil
 }

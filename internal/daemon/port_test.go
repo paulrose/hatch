@@ -47,6 +47,22 @@ func TestParseLsofOutput(t *testing.T) {
 			port: 443,
 			want: &PortInfo{Process: "caddy", PID: 1000},
 		},
+		{
+			name: "outbound connections ignored",
+			output: "COMMAND  PID   USER   FD   TYPE DEVICE SIZE/OFF NODE NAME\n" +
+				"Slack   33068   paul   51u  IPv4  0x1234      0t0  TCP 192.168.10.5:51324->1.2.3.4:443 (ESTABLISHED)\n" +
+				"Google  48801   paul   52u  IPv4  0x5678      0t0  TCP 192.168.10.5:51400->5.6.7.8:443 (ESTABLISHED)\n",
+			port: 443,
+			want: nil,
+		},
+		{
+			name: "listen mixed with established",
+			output: "COMMAND  PID   USER   FD   TYPE DEVICE SIZE/OFF NODE NAME\n" +
+				"Slack   33068   paul   51u  IPv4  0x1234      0t0  TCP 192.168.10.5:51324->1.2.3.4:443 (ESTABLISHED)\n" +
+				"nginx   1234    root    6u  IPv4  12345       0t0  TCP *:443 (LISTEN)\n",
+			port: 443,
+			want: &PortInfo{Process: "nginx", PID: 1234},
+		},
 	}
 
 	for _, tt := range tests {
