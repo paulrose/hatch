@@ -53,6 +53,14 @@ func runUp() error {
 		}
 	}
 
+	// Generate intermediate CA if needed.
+	if !certs.IntermediateCAExists(caPaths) {
+		log.Info().Msg("generating intermediate CA")
+		if err := certs.GenerateIntermediateCA(caPaths); err != nil {
+			return fmt.Errorf("generate intermediate CA: %w", err)
+		}
+	}
+
 	// Trust CA if needed.
 	if !certs.IsCATrusted(caPaths.Cert) {
 		log.Info().Msg("trusting root CA (may prompt for password)")

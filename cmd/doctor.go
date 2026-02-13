@@ -57,7 +57,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		fail(fmt.Sprintf("Config file is invalid: %v", err), "Fix the errors in ~/.hatch/config.yml or run 'hatch init'")
 		// Without valid config, skip downstream checks that need it.
-		total += 7
+		total += 8
 		fmt.Println()
 		fmt.Printf("%s\n", yellow(fmt.Sprintf("%d/%d checks passed", passed, total)))
 		return nil
@@ -87,7 +87,14 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		fail("Root CA is not trusted", "Run 'hatch trust' to re-trust the root CA")
 	}
 
-	// Check 5: Launchd plist installed
+	// Check 5: Intermediate CA exists
+	if certs.IntermediateCAExists(caPaths) {
+		pass("Intermediate CA exists")
+	} else {
+		fail("Intermediate CA not found", "Run 'hatch up' to generate an intermediate CA")
+	}
+
+	// Check 6: Launchd plist installed
 	plistPath, err := daemon.PlistPath()
 	if err != nil {
 		fail(fmt.Sprintf("Could not determine plist path: %v", err), "")

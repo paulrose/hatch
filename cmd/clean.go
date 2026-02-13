@@ -7,6 +7,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
+	"github.com/paulrose/hatch/internal/caddy"
 	"github.com/paulrose/hatch/internal/certs"
 	"github.com/paulrose/hatch/internal/config"
 	"github.com/paulrose/hatch/internal/daemon"
@@ -98,7 +99,20 @@ func runClean(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  %s Root CA not trusted\n", green("✓"))
 	}
 
-	// Step 4: Delete ~/.hatch directory
+	// Step 4: Delete Caddy data directory
+	caddyDataDir := caddy.DataDir()
+	if dirExistsAt(caddyDataDir) {
+		if err := os.RemoveAll(caddyDataDir); err != nil {
+			fmt.Printf("  %s Failed to remove Caddy data directory: %v\n", red("✗"), err)
+			os.Exit(1)
+		}
+		fmt.Printf("  %s Caddy data directory removed\n", green("✓"))
+		anyCleaned = true
+	} else {
+		fmt.Printf("  %s Caddy data directory not found\n", green("✓"))
+	}
+
+	// Step 5: Delete ~/.hatch directory
 	if dirExistsAt(config.Dir()) {
 		if err := os.RemoveAll(config.Dir()); err != nil {
 			fmt.Printf("  %s Failed to remove config directory: %v\n", red("✗"), err)

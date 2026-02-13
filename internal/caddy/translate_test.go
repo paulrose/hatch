@@ -54,7 +54,7 @@ func TestTranslate_SingleService(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	httpsServer := servers["hatch_https"].(map[string]any)
@@ -104,7 +104,7 @@ func TestTranslate_PathRouting(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -142,7 +142,7 @@ func TestTranslate_SubdomainRouting(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -177,7 +177,7 @@ func TestTranslate_WebSocket(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -213,7 +213,7 @@ func TestTranslate_WebSocket(t *testing.T) {
 
 func TestTranslate_RouteOrdering(t *testing.T) {
 	cfg := fullConfig()
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -269,7 +269,7 @@ func TestTranslate_DisabledSkipped(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -306,7 +306,7 @@ func TestTranslate_MultipleProjects(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	routes := servers["hatch_https"].(map[string]any)["routes"].([]map[string]any)
@@ -328,7 +328,7 @@ func TestTranslate_MultipleProjects(t *testing.T) {
 
 func TestTranslate_HTTPRedirects(t *testing.T) {
 	cfg := fullConfig()
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	httpServer := servers["hatch_http"].(map[string]any)
@@ -363,7 +363,7 @@ func TestTranslate_HTTPRedirects(t *testing.T) {
 
 func TestTranslate_TLSAutomation(t *testing.T) {
 	cfg := fullConfig()
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	tls := result["apps"].(map[string]any)["tls"].(map[string]any)
 	automation := tls["automation"].(map[string]any)
@@ -400,7 +400,7 @@ func TestTranslate_CustomPorts(t *testing.T) {
 		Projects: map[string]config.Project{},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 
@@ -425,7 +425,7 @@ func TestTranslate_EmptyConfig(t *testing.T) {
 		Projects: map[string]config.Project{},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	// Should still produce valid structure.
 	servers := result["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
@@ -466,10 +466,14 @@ func TestTranslate_PKIConfig(t *testing.T) {
 		},
 	}
 
-	certPath := "/home/user/.hatch/certs/rootCA.pem"
-	keyPath := "/home/user/.hatch/certs/rootCA-key.pem"
+	pkiPaths := PKIPaths{
+		RootCert:         "/home/user/.hatch/certs/rootCA.pem",
+		RootKey:          "/home/user/.hatch/certs/rootCA-key.pem",
+		IntermediateCert: "/home/user/.hatch/certs/intermediateCA.pem",
+		IntermediateKey:  "/home/user/.hatch/certs/intermediateCA-key.pem",
+	}
 
-	result := Translate(cfg, certPath, keyPath)
+	result := Translate(cfg, pkiPaths)
 
 	apps := result["apps"].(map[string]any)
 
@@ -484,11 +488,20 @@ func TestTranslate_PKIConfig(t *testing.T) {
 		t.Errorf("expected CA name 'Hatch Local CA', got %s", hatchCA["name"])
 	}
 	root := hatchCA["root"].(map[string]any)
-	if root["certificate"] != certPath {
-		t.Errorf("expected certificate %s, got %s", certPath, root["certificate"])
+	if root["certificate"] != pkiPaths.RootCert {
+		t.Errorf("expected certificate %s, got %s", pkiPaths.RootCert, root["certificate"])
 	}
-	if root["private_key"] != keyPath {
-		t.Errorf("expected private_key %s, got %s", keyPath, root["private_key"])
+	if root["private_key"] != pkiPaths.RootKey {
+		t.Errorf("expected private_key %s, got %s", pkiPaths.RootKey, root["private_key"])
+	}
+
+	// Intermediate should be present.
+	intermediate := hatchCA["intermediate"].(map[string]any)
+	if intermediate["certificate"] != pkiPaths.IntermediateCert {
+		t.Errorf("expected intermediate certificate %s, got %s", pkiPaths.IntermediateCert, intermediate["certificate"])
+	}
+	if intermediate["private_key"] != pkiPaths.IntermediateKey {
+		t.Errorf("expected intermediate private_key %s, got %s", pkiPaths.IntermediateKey, intermediate["private_key"])
 	}
 
 	// TLS issuer should reference "hatch" CA.
@@ -500,6 +513,48 @@ func TestTranslate_PKIConfig(t *testing.T) {
 	}
 	if issuers[0]["ca"] != "hatch" {
 		t.Errorf("expected ca 'hatch', got %v", issuers[0]["ca"])
+	}
+}
+
+func TestTranslate_PKIConfig_RootOnlyNoIntermediate(t *testing.T) {
+	cfg := config.Config{
+		Version: 1,
+		Settings: config.Settings{
+			HTTPPort:  80,
+			HTTPSPort: 443,
+		},
+		Projects: map[string]config.Project{
+			"myapp": {
+				Domain:  "myapp.test",
+				Path:    "/path/to/myapp",
+				Enabled: true,
+				Services: map[string]config.Service{
+					"web": {Proxy: "http://localhost:3000"},
+				},
+			},
+		},
+	}
+
+	pkiPaths := PKIPaths{
+		RootCert: "/home/user/.hatch/certs/rootCA.pem",
+		RootKey:  "/home/user/.hatch/certs/rootCA-key.pem",
+	}
+
+	result := Translate(cfg, pkiPaths)
+
+	apps := result["apps"].(map[string]any)
+	pki := apps["pki"].(map[string]any)
+	cas := pki["certificate_authorities"].(map[string]any)
+	hatchCA := cas["hatch"].(map[string]any)
+
+	// Root should be present.
+	if _, ok := hatchCA["root"]; !ok {
+		t.Error("expected root to be present")
+	}
+
+	// Intermediate should NOT be present.
+	if _, ok := hatchCA["intermediate"]; ok {
+		t.Error("expected no intermediate when paths are empty")
 	}
 }
 
@@ -522,7 +577,7 @@ func TestTranslate_PKIConfig_NoPKIWhenEmpty(t *testing.T) {
 		},
 	}
 
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	apps := result["apps"].(map[string]any)
 
@@ -542,7 +597,7 @@ func TestTranslate_PKIConfig_NoPKIWhenEmpty(t *testing.T) {
 
 func TestTranslate_GoldenFile(t *testing.T) {
 	cfg := fullConfig()
-	result := Translate(cfg, "", "")
+	result := Translate(cfg, PKIPaths{})
 
 	got, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {

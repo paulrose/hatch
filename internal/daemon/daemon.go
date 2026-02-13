@@ -60,6 +60,10 @@ func (d *Daemon) Run(ctx context.Context) error {
 		RemovePID(d.pidFile)
 		return fmt.Errorf("CA files not found at %s — run 'hatch up' to generate", config.CertsDir())
 	}
+	if !certs.IntermediateCAExists(d.caPaths) {
+		RemovePID(d.pidFile)
+		return fmt.Errorf("intermediate CA files not found at %s — run 'hatch up' to generate", config.CertsDir())
+	}
 
 	// Start DNS server.
 	dnsSrv, err := dns.NewServer(dns.ServerConfig{
@@ -78,6 +82,11 @@ func (d *Daemon) Run(ctx context.Context) error {
 	d.dns = dnsSrv
 	log.Info().Str("tld", cfg.Settings.TLD).Int("port", dns.DefaultPort).Msg("dns server started")
 
+	// Clear Caddy's cached PKI so it uses our intermediate CA.
+	if err := caddy.ClearPKICache(); err != nil {
+		log.Warn().Err(err).Msg("failed to clear caddy PKI cache")
+	}
+
 	// Start Caddy server.
 	caddySrv := caddy.NewServer(caddy.ServerConfig{
 		AdminAddr: caddy.DefaultAdminAddr,
@@ -90,7 +99,12 @@ func (d *Daemon) Run(ctx context.Context) error {
 	log.Info().Msg("caddy server started")
 
 	// Load translated config into Caddy.
-	caddyCfg := caddy.Translate(cfg, d.caPaths.Cert, d.caPaths.Key)
+	caddyCfg := caddy.Translate(cfg, caddy.PKIPaths{
+		RootCert:         d.caPaths.Cert,
+		RootKey:          d.caPaths.Key,
+		IntermediateCert: d.caPaths.IntermediateCert,
+		IntermediateKey:  d.caPaths.IntermediateKey,
+	})
 	if err := caddySrv.LoadConfig(ctx, caddyCfg); err != nil {
 		d.shutdownPartial()
 		return fmt.Errorf("load caddy config: %w", err)
@@ -199,7 +213,12 @@ func (d *Daemon) onConfigReload(cfg config.Config) {
 	d.cfg = cfg
 	d.mu.Unlock()
 
-	caddyCfg := caddy.Translate(cfg, d.caPaths.Cert, d.caPaths.Key)
+	caddyCfg := caddy.Translate(cfg, caddy.PKIPaths{
+		RootCert:         d.caPaths.Cert,
+		RootKey:          d.caPaths.Key,
+		IntermediateCert: d.caPaths.IntermediateCert,
+		IntermediateKey:  d.caPaths.IntermediateKey,
+	})
 	if err := d.caddy.LoadConfig(context.Background(), caddyCfg); err != nil {
 		log.Error().Err(err).Msg("failed to reload caddy config")
 		return

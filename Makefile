@@ -7,10 +7,13 @@ LDFLAGS := -s -w \
 	-X github.com/paulrose/hatch/cmd.commit=$(COMMIT) \
 	-X github.com/paulrose/hatch/cmd.date=$(DATE)
 
-.PHONY: build run test clean
+.PHONY: build build-test run test clean
 
 build:
 	go build -ldflags '$(LDFLAGS)' -o hatch .
+
+build-test:
+	go build -ldflags '$(LDFLAGS)' -o testing/hatch .
 
 run:
 	go run -ldflags '$(LDFLAGS)' . $(ARGS)

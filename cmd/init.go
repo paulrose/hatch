@@ -79,6 +79,18 @@ func runInit(cmd *cobra.Command, args []string) error {
 		anyCreated = true
 	}
 
+	// Step 3.5: Intermediate CA
+	if certs.IntermediateCAExists(caPaths) {
+		fmt.Printf("  %s Intermediate CA exists\n", green("✓"))
+	} else {
+		if err := certs.GenerateIntermediateCA(caPaths); err != nil {
+			fmt.Printf("  %s Failed to generate intermediate CA: %v\n", red("✗"), err)
+			os.Exit(1)
+		}
+		fmt.Printf("  %s Intermediate CA generated\n", green("✓"))
+		anyCreated = true
+	}
+
 	// Step 4: Trust CA
 	if certs.IsCATrusted(caPaths.Cert) {
 		fmt.Printf("  %s Root CA already trusted\n", green("✓"))
