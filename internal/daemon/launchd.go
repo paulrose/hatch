@@ -149,7 +149,7 @@ func DefaultLaunchdConfig(autoStart bool) (LaunchdConfig, error) {
 		Label:            PlistLabel,
 		BinaryPath:       bin,
 		WorkingDirectory: config.Dir(),
-		LogDir:           config.Dir(),
+		LogDir:           config.LogsDir(),
 		KeepAlive:        autoStart,
 	}, nil
 }

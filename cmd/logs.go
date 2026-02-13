@@ -27,7 +27,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	lines, _ := cmd.Flags().GetInt("lines")
 
 	if follow {
-		tailCmd := exec.Command("tail", "-n", fmt.Sprintf("%d", lines), "-f", path)
+		tailCmd := exec.Command("tail", "-n", fmt.Sprintf("%d", lines), "-F", path)
 		tailCmd.Stdin = os.Stdin
 		tailCmd.Stdout = os.Stdout
 		tailCmd.Stderr = os.Stderr

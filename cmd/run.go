@@ -8,7 +8,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/paulrose/hatch/internal/config"
 	"github.com/paulrose/hatch/internal/daemon"
+	"github.com/paulrose/hatch/internal/logging"
 )
 
 var runCmd = &cobra.Command{
@@ -18,6 +20,24 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGINT)
 		defer stop()
+
+		// Best-effort config load to read log level; default to "info".
+		logLevel := "info"
+		if cfg, err := config.Load(); err == nil {
+			if cfg.Settings.LogLevel != "" {
+				logLevel = cfg.Settings.LogLevel
+			}
+		}
+
+		w, err := logging.Setup(logging.Config{
+			FilePath: config.LogFile(),
+			Level:    logLevel,
+		})
+		if err != nil {
+			log.Error().Err(err).Msg("failed to setup logging")
+			os.Exit(1)
+		}
+		defer w.Close()
 
 		d := daemon.New()
 		if err := d.Run(ctx); err != nil {

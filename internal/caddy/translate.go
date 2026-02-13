@@ -28,6 +28,9 @@ func Translate(cfg config.Config, rootCACert, rootCAKey string) map[string]any {
 					"routes":                 httpsRoutes,
 					"tls_connection_policies": []map[string]any{{}},
 					"automatic_https":         map[string]any{},
+					"logs": map[string]any{
+						"default_logger_name": "access",
+					},
 				},
 				"hatch_http": map[string]any{
 					"listen": []string{httpPort},
@@ -46,7 +49,8 @@ func Translate(cfg config.Config, rootCACert, rootCAKey string) map[string]any {
 		"admin": map[string]any{
 			"listen": DefaultAdminAddr,
 		},
-		"apps": apps,
+		"apps":    apps,
+		"logging": buildLoggingConfig(),
 	}
 }
 
@@ -248,6 +252,24 @@ func collectDomains(cfg config.Config) []string {
 	}
 	sort.Strings(domains)
 	return domains
+}
+
+// buildLoggingConfig returns the top-level Caddy logging configuration.
+// Access logs are sent to stderr (which the daemon captures via pipe into
+// the rotated log file). Noisy Caddy internals are silenced to WARN.
+func buildLoggingConfig() map[string]any {
+	return map[string]any{
+		"logs": map[string]any{
+			"default": map[string]any{
+				"level":  "WARN",
+				"writer": map[string]any{"output": "stderr"},
+			},
+			"access": map[string]any{
+				"writer":  map[string]any{"output": "stderr"},
+				"include": []string{"http.log.access"},
+			},
+		},
+	}
 }
 
 // extractDialAddress parses a proxy URL and returns the host:port dial address.

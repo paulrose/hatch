@@ -9,6 +9,7 @@ const (
 	configDirName  = ".hatch"
 	configFileName = "config.yml"
 	certsDirName   = "certs"
+	logsDirName    = "logs"
 )
 
 // Dir returns the Hatch configuration directory.
@@ -34,7 +35,12 @@ func CertsDir() string {
 	return filepath.Join(Dir(), certsDirName)
 }
 
+// LogsDir returns the path to the logs directory.
+func LogsDir() string {
+	return filepath.Join(Dir(), logsDirName)
+}
+
 // LogFile returns the path to the daemon log file.
 func LogFile() string {
-	return filepath.Join(Dir(), "daemon.log")
+	return filepath.Join(LogsDir(), "hatch.log")
 }
