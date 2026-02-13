@@ -8,14 +8,23 @@ import (
 	"github.com/paulrose/hatch/internal/config"
 )
 
+// PKIPaths holds the file paths for root and intermediate CA certificates
+// and keys used to configure Caddy's PKI app.
+type PKIPaths struct {
+	RootCert         string
+	RootKey          string
+	IntermediateCert string
+	IntermediateKey  string
+}
+
 // Translate converts a Hatch config into a full Caddy JSON configuration.
 // It skips disabled projects and returns a map suitable for JSON marshaling.
-// When rootCACert and rootCAKey are non-empty, a PKI app is added so Caddy
-// uses the provided root CA for issuing leaf certificates.
-func Translate(cfg config.Config, rootCACert, rootCAKey string) map[string]any {
+// When pki.RootCert is non-empty, a PKI app is added so Caddy uses the
+// provided CA for issuing leaf certificates.
+func Translate(cfg config.Config, pki PKIPaths) map[string]any {
 	httpsRoutes := buildRoutes(cfg)
 	httpRedirectRoutes := buildHTTPRedirectRoutes(cfg)
-	tlsConfig := buildTLSConfig(cfg, rootCACert)
+	tlsConfig := buildTLSConfig(cfg, pki.RootCert)
 
 	httpsPort := fmt.Sprintf(":%d", cfg.Settings.HTTPSPort)
 	httpPort := fmt.Sprintf(":%d", cfg.Settings.HTTPPort)
@@ -27,7 +36,9 @@ func Translate(cfg config.Config, rootCACert, rootCAKey string) map[string]any {
 					"listen":                 []string{httpsPort},
 					"routes":                 httpsRoutes,
 					"tls_connection_policies": []map[string]any{{}},
-					"automatic_https":         map[string]any{},
+					"automatic_https": map[string]any{
+						"disable_redirects": true,
+					},
 					"logs": map[string]any{
 						"default_logger_name": "access",
 					},
@@ -41,8 +52,8 @@ func Translate(cfg config.Config, rootCACert, rootCAKey string) map[string]any {
 		"tls": tlsConfig,
 	}
 
-	if rootCACert != "" {
-		apps["pki"] = buildPKIConfig(rootCACert, rootCAKey)
+	if pki.RootCert != "" {
+		apps["pki"] = buildPKIConfig(pki)
 	}
 
 	return map[string]any{
@@ -186,7 +197,6 @@ func buildHTTPRedirectRoutes(cfg config.Config) []map[string]any {
 }
 
 // buildTLSConfig builds the TLS automation config with internal issuer.
-// It adds *.domain wildcards only for projects that use subdomains.
 // When rootCACert is non-empty, the issuer references the "hatch" CA.
 func buildTLSConfig(cfg config.Config, rootCACert string) map[string]any {
 	domains := collectDomains(cfg)
@@ -212,23 +222,30 @@ func buildTLSConfig(cfg config.Config, rootCACert string) map[string]any {
 }
 
 // buildPKIConfig returns the Caddy PKI app configuration that registers
-// a "hatch" certificate authority backed by the given root CA files.
-func buildPKIConfig(rootCACert, rootCAKey string) map[string]any {
-	return map[string]any{
-		"certificate_authorities": map[string]any{
-			"hatch": map[string]any{
-				"name": "Hatch Local CA",
-				"root": map[string]any{
-					"certificate": rootCACert,
-					"private_key": rootCAKey,
-				},
-			},
+// a "hatch" certificate authority backed by the given root and optional
+// intermediate CA files.
+func buildPKIConfig(pki PKIPaths) map[string]any {
+	ca := map[string]any{
+		"name": "Hatch Local CA",
+		"root": map[string]any{
+			"certificate": pki.RootCert,
+			"private_key": pki.RootKey,
 		},
+	}
+	if pki.IntermediateCert != "" {
+		ca["intermediate"] = map[string]any{
+			"certificate": pki.IntermediateCert,
+			"private_key": pki.IntermediateKey,
+		}
+	}
+	return map[string]any{
+		"certificate_authorities": map[string]any{"hatch": ca},
 	}
 }
 
 // collectDomains returns all unique domains across enabled projects, sorted.
-// It adds *.domain wildcards for projects that have subdomain services.
+// Each service's full domain is listed explicitly so that Caddy's automatic
+// HTTPS exact-match check recognises them against the TLS automation policy.
 func collectDomains(cfg config.Config) []string {
 	domainSet := make(map[string]bool)
 
@@ -240,8 +257,7 @@ func collectDomains(cfg config.Config) []string {
 
 		for _, svc := range proj.Services {
 			if svc.Subdomain != "" {
-				domainSet["*."+proj.Domain] = true
-				break
+				domainSet[svc.Subdomain+"."+proj.Domain] = true
 			}
 		}
 	}
