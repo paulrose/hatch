@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -24,7 +25,7 @@ func PIDFile() string {
 func WritePID() (*os.File, error) {
 	path := PIDFile()
 
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open pid file: %w", err)
 	}
@@ -79,6 +80,22 @@ func ReadPID() (int, error) {
 	return pid, nil
 }
 
+// readPIDFrom reads the PID from an already-open file.
+func readPIDFrom(f *os.File) (int, error) {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return 0, err
+	}
+	data, err := io.ReadAll(io.LimitReader(f, 32))
+	if err != nil {
+		return 0, err
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0, fmt.Errorf("parse pid: %w", err)
+	}
+	return pid, nil
+}
+
 // IsRunning checks whether the daemon is running by attempting to acquire
 // an flock on the PID file. If the lock cannot be acquired (EWOULDBLOCK),
 // the daemon is running.
@@ -97,7 +114,8 @@ func IsRunning() (bool, int, error) {
 	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 	if err != nil {
 		// Lock held by another process — daemon is running.
-		pid, readErr := ReadPID()
+		// Read PID from the already-open fd to avoid TOCTOU race.
+		pid, readErr := readPIDFrom(f)
 		if readErr != nil {
 			return true, 0, nil
 		}

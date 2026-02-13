@@ -29,6 +29,7 @@ Thumbs.db
 .env.local
 
 .claude
+CLAUDE.md
 
 # Testing
 testing/

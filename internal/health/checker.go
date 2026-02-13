@@ -1,6 +1,7 @@
 package health
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/url"
@@ -144,15 +145,24 @@ func (c *Checker) checkAll() {
 	}
 	c.mu.Unlock()
 
+	// Cap the total time for a full check cycle.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	for key, addr := range snap {
-		c.checkOne(key, addr)
+		if ctx.Err() != nil {
+			log.Warn().Msg("health check cycle timed out, skipping remaining targets")
+			return
+		}
+		c.checkOne(ctx, key, addr)
 	}
 }
 
 // checkOne dials a single target, updates its status, and fires the
 // OnChange callback when the status transitions.
-func (c *Checker) checkOne(key ServiceKey, addr string) {
-	conn, err := net.DialTimeout("tcp", addr, c.cfg.Timeout)
+func (c *Checker) checkOne(ctx context.Context, key ServiceKey, addr string) {
+	dialer := net.Dialer{Timeout: c.cfg.Timeout}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if conn != nil {
 		conn.Close()
 	}
