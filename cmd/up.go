@@ -64,7 +64,7 @@ func runUp() error {
 	// Trust CA if needed.
 	if !certs.IsCATrusted(caPaths.Cert) {
 		log.Info().Msg("trusting root CA (may prompt for password)")
-		if err := certs.TrustCA(&certs.OSAScriptRunner{}, caPaths.Cert); err != nil {
+		if err := certs.TrustCA(&sudoRunner{}, caPaths.Cert); err != nil {
 			return fmt.Errorf("trust CA: %w", err)
 		}
 	}
@@ -72,7 +72,7 @@ func runUp() error {
 	// Install DNS resolver if needed.
 	if !dns.IsResolverInstalled(cfg.Settings.TLD) {
 		log.Info().Str("tld", cfg.Settings.TLD).Msg("installing DNS resolver (may prompt for password)")
-		if err := dns.InstallResolverFile(&dns.OSAScriptRunner{}, cfg.Settings.TLD, dns.DefaultListenIP, dns.DefaultPort); err != nil {
+		if err := dns.InstallResolverFile(&sudoRunner{}, cfg.Settings.TLD, dns.DefaultListenIP, dns.DefaultPort); err != nil {
 			return fmt.Errorf("install resolver: %w", err)
 		}
 	}

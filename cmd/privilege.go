@@ -8,8 +8,7 @@ import (
 )
 
 // sudoRunner executes commands via sudo, inheriting the terminal's TTY
-// so the password prompt works. Used as a fallback when osascript cannot
-// complete Keychain authorization.
+// so the password prompt works.
 type sudoRunner struct{}
 
 func (r *sudoRunner) Run(command string) error {

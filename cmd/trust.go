@@ -24,7 +24,6 @@ func init() {
 
 func runTrust(cmd *cobra.Command, args []string) error {
 	green := color.New(color.FgGreen).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 
 	caPaths := certs.NewCAPaths(config.CertsDir())
@@ -56,14 +55,8 @@ func runTrust(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	var trustErr error
-	trustErr = certs.TrustCA(&certs.OSAScriptRunner{}, caPaths.Cert)
-	if trustErr != nil {
-		fmt.Printf("  %s osascript trust failed, trying sudo...\n", yellow("!"))
-		trustErr = certs.TrustCA(&sudoRunner{}, caPaths.Cert)
-	}
-	if trustErr != nil {
-		fmt.Printf("  %s Failed to trust root CA: %v\n", red("✗"), trustErr)
+	if err := certs.TrustCA(&sudoRunner{}, caPaths.Cert); err != nil {
+		fmt.Printf("  %s Failed to trust root CA: %v\n", red("✗"), err)
 		os.Exit(1)
 	}
 

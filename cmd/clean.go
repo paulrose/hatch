@@ -28,7 +28,6 @@ func init() {
 func runClean(cmd *cobra.Command, args []string) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
 	cyan := color.New(color.FgCyan, color.Bold).SprintFunc()
 
 	fmt.Printf("Cleaning up %s...\n\n", cyan("Hatch"))
@@ -65,14 +64,8 @@ func runClean(cmd *cobra.Command, args []string) error {
 
 	// Step 2: Remove DNS resolver
 	if dns.IsResolverInstalled(tld) {
-		var removeErr error
-		removeErr = dns.RemoveResolverFile(&dns.OSAScriptRunner{}, tld)
-		if removeErr != nil {
-			fmt.Printf("  %s osascript failed, trying sudo...\n", yellow("!"))
-			removeErr = dns.RemoveResolverFile(&sudoRunner{}, tld)
-		}
-		if removeErr != nil {
-			fmt.Printf("  %s Failed to remove DNS resolver: %v\n", red("✗"), removeErr)
+		if err := dns.RemoveResolverFile(&sudoRunner{}, tld); err != nil {
+			fmt.Printf("  %s Failed to remove DNS resolver: %v\n", red("✗"), err)
 			os.Exit(1)
 		}
 		fmt.Printf("  %s DNS resolver removed\n", green("✓"))
@@ -83,14 +76,8 @@ func runClean(cmd *cobra.Command, args []string) error {
 
 	// Step 3: Untrust CA from Keychain
 	if certs.CAExists(caPaths) && certs.IsCATrusted(caPaths.Cert) {
-		var untrustErr error
-		untrustErr = certs.UntrustCA(&certs.OSAScriptRunner{}, caPaths.Cert)
-		if untrustErr != nil {
-			fmt.Printf("  %s osascript failed, trying sudo...\n", yellow("!"))
-			untrustErr = certs.UntrustCA(&sudoRunner{}, caPaths.Cert)
-		}
-		if untrustErr != nil {
-			fmt.Printf("  %s Failed to untrust root CA: %v\n", red("✗"), untrustErr)
+		if err := certs.UntrustCA(&sudoRunner{}, caPaths.Cert); err != nil {
+			fmt.Printf("  %s Failed to untrust root CA: %v\n", red("✗"), err)
 			os.Exit(1)
 		}
 		fmt.Printf("  %s Root CA untrusted\n", green("✓"))
