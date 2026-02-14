@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/paulrose/hatch/internal/api"
 	"github.com/paulrose/hatch/internal/config"
 	"github.com/paulrose/hatch/internal/daemon"
 	"github.com/paulrose/hatch/internal/logging"
@@ -29,9 +30,12 @@ var runCmd = &cobra.Command{
 			}
 		}
 
+		logHub := api.NewLogHub()
+
 		w, err := logging.Setup(logging.Config{
-			FilePath: config.LogFile(),
-			Level:    logLevel,
+			FilePath:    config.LogFile(),
+			Level:       logLevel,
+			ExtraWriter: logHub,
 		})
 		if err != nil {
 			log.Error().Err(err).Msg("failed to setup logging")
@@ -39,7 +43,7 @@ var runCmd = &cobra.Command{
 		}
 		defer w.Close()
 
-		d := daemon.New()
+		d := daemon.New(version, logHub)
 		if err := d.Run(ctx); err != nil {
 			log.Error().Err(err).Msg("daemon exited with error")
 			os.Exit(1)
