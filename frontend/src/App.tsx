@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Call } from "@wailsio/runtime";
+import { GetVersion } from "../bindings/github.com/paulrose/hatch/internal/app/app.js";
 import "./App.css";
 
 function App() {
   const [version, setVersion] = useState("loading...");
 
   useEffect(() => {
-    Call.ByName("github.com/paulrose/hatch/internal/app.App.GetVersion")
+    GetVersion()
       .then((result) => setVersion(String(result)))
       .catch((err) => {
         console.warn("GetVersion binding call failed:", err);
