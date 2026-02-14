@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/paulrose/hatch/internal/api"
 	"github.com/paulrose/hatch/internal/caddy"
 	"github.com/paulrose/hatch/internal/certs"
 	"github.com/paulrose/hatch/internal/config"
@@ -19,25 +21,34 @@ import (
 
 // Daemon orchestrates all Hatch subsystems as a long-running background process.
 type Daemon struct {
-	caddy   *caddy.Server
-	dns     *dns.Server
-	health  *health.Checker
-	watcher *config.Watcher
-	pidFile *os.File
-	caPaths certs.CAPaths
-	cfg     config.Config
-	mu      sync.Mutex
-	running bool
+	caddy     *caddy.Server
+	dns       *dns.Server
+	health    *health.Checker
+	watcher   *config.Watcher
+	api       *api.Server
+	pidFile   *os.File
+	caPaths   certs.CAPaths
+	cfg       config.Config
+	mu        sync.Mutex
+	running   bool
+	version   string
+	startTime time.Time
+	logHub    *api.LogHub
 }
 
-// New creates a new Daemon instance.
-func New() *Daemon {
-	return &Daemon{}
+// New creates a new Daemon instance with the given version and log hub.
+func New(version string, logHub *api.LogHub) *Daemon {
+	return &Daemon{
+		version: version,
+		logHub:  logHub,
+	}
 }
 
 // Run starts all subsystems and blocks until ctx is cancelled.
 // On context cancellation it performs a graceful shutdown.
 func (d *Daemon) Run(ctx context.Context) error {
+	d.startTime = time.Now()
+
 	// Write PID file (acquires flock).
 	pidFile, err := WritePID()
 	if err != nil {
@@ -131,6 +142,22 @@ func (d *Daemon) Run(ctx context.Context) error {
 	d.health = checker
 	log.Info().Msg("health checker started")
 
+	// Start API server.
+	apiSrv := api.NewServer(api.ServerConfig{
+		Addr:      "127.0.0.1:42824",
+		Health:    d.health,
+		Daemon:    d,
+		Version:   d.version,
+		StartTime: d.startTime,
+		LogHub:    d.logHub,
+	})
+	if err := apiSrv.Start(); err != nil {
+		d.shutdownPartial()
+		return fmt.Errorf("start api server: %w", err)
+	}
+	d.api = apiSrv
+	log.Info().Str("addr", "127.0.0.1:42824").Msg("api server started")
+
 	// Start config watcher.
 	watcher, err := config.NewWatcher(d.onConfigReload)
 	if err != nil {
@@ -165,7 +192,17 @@ func (d *Daemon) Shutdown() error {
 
 	var errs []error
 
-	// Watcher first — prevents reload during teardown.
+	// API server first — stop accepting requests.
+	if d.api != nil {
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := d.api.Shutdown(shutCtx); err != nil {
+			errs = append(errs, fmt.Errorf("stop api server: %w", err))
+		}
+		cancel()
+		log.Info().Msg("api server stopped")
+	}
+
+	// Watcher — prevents reload during teardown.
 	if d.watcher != nil {
 		if err := d.watcher.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("stop watcher: %w", err))
@@ -239,8 +276,23 @@ func (d *Daemon) onConfigReload(cfg config.Config) {
 	log.Info().Msg("config reloaded successfully")
 }
 
+// ReloadConfig loads the current config and applies it to Caddy and the health checker.
+func (d *Daemon) ReloadConfig() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	d.onConfigReload(cfg)
+	return nil
+}
+
 // shutdownPartial stops any subsystems that were started during a failed Run.
 func (d *Daemon) shutdownPartial() {
+	if d.api != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		d.api.Shutdown(ctx)
+		cancel()
+	}
 	if d.health != nil {
 		d.health.Stop()
 	}

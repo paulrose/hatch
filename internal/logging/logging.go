@@ -12,11 +12,12 @@ import (
 
 // Config controls how the structured logger is initialised.
 type Config struct {
-	FilePath   string
-	Level      string
-	MaxSizeMB  int
-	MaxAgeDays int
-	MaxBackups int
+	FilePath    string
+	Level       string
+	MaxSizeMB   int
+	MaxAgeDays  int
+	MaxBackups  int
+	ExtraWriter io.Writer // optional additional writer (e.g. SSE log hub)
 }
 
 func (c Config) withDefaults() Config {
@@ -56,8 +57,12 @@ func Setup(cfg Config) (*Writer, error) {
 		Compress:   false,
 	}
 
-	// Set zerolog global logger to write JSON to lumberjack.
-	log.Logger = zerolog.New(lj).Level(parseLevel(cfg.Level)).With().Timestamp().Logger()
+	// Set zerolog global logger to write JSON to lumberjack (and optional extra writer).
+	var w io.Writer = lj
+	if cfg.ExtraWriter != nil {
+		w = zerolog.MultiLevelWriter(lj, cfg.ExtraWriter)
+	}
+	log.Logger = zerolog.New(w).Level(parseLevel(cfg.Level)).With().Timestamp().Logger()
 
 	// Capture os.Stderr via os.Pipe so Caddy's stderr output reaches lumberjack.
 	pr, pw, err := os.Pipe()
