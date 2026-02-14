@@ -22,7 +22,7 @@ test:
 	go test ./...
 
 frontend:
-	cd frontend && npm install && npm run build
+	cd frontend && npm install && VITE_APP_VERSION=$(VERSION) npm run build
 
 app: frontend
 	go build -ldflags '$(LDFLAGS) -extldflags -w' -o hatch .

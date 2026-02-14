@@ -14,7 +14,7 @@ var appCmd = &cobra.Command{
 	Use:   "app",
 	Short: "Launch the Hatch GUI",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		a := app.NewApp(version)
+		a := app.NewApp()
 
 		frontendAssets, err := fs.Sub(embeddedAssets, "frontend/dist")
 		if err != nil {
