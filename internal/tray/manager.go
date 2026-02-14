@@ -50,7 +50,7 @@ func NewManager(cfg ManagerConfig) *Manager {
 // Start initialises the tray icon and begins periodic health polling.
 func (m *Manager) Start() {
 	m.tray = m.app.SystemTray.New()
-	m.tray.SetIcon(BadgeGray)
+	m.tray.SetTemplateIcon(iconPNG)
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -123,9 +123,6 @@ func (m *Manager) refresh() {
 	if m.checker != nil {
 		statuses = m.checker.ServiceStatuses()
 	}
-
-	// Update icon badge.
-	m.tray.SetIcon(m.computeBadge(running, statuses))
 
 	// Build menu.
 	menu := m.app.NewMenu()
@@ -266,18 +263,6 @@ func (m *Manager) buildProjectItem(menu *application.Menu, name string, proj con
 		addr := svc.Proxy
 		sub.Add(fmt.Sprintf("%s  %s  %s", svcName, addr, indicator)).SetEnabled(false)
 	}
-}
-
-func (m *Manager) computeBadge(running bool, statuses map[health.ServiceKey]health.ServiceStatus) []byte {
-	if !running {
-		return BadgeRed
-	}
-	for _, s := range statuses {
-		if s.Status == health.StatusUnhealthy {
-			return BadgeYellow
-		}
-	}
-	return BadgeGreen
 }
 
 func (m *Manager) showWindow() {
