@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
+import { Call } from "@wailsio/runtime";
 import "./App.css";
 
 function App() {
   const [version, setVersion] = useState("loading...");
 
   useEffect(() => {
-    if (window.go?.app?.App?.GetVersion) {
-      window.go.app.App.GetVersion().then(setVersion);
-    } else {
-      setVersion("dev (no wails runtime)");
-    }
+    Call.ByName("github.com/paulrose/hatch/internal/app.App.GetVersion")
+      .then((result) => setVersion(String(result)))
+      .catch((err) => {
+        console.warn("GetVersion binding call failed:", err);
+        setVersion("dev (no wails runtime)");
+      });
   }, []);
 
   return (
