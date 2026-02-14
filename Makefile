@@ -25,7 +25,7 @@ frontend:
 	cd frontend && npm install && npm run build
 
 app: frontend
-	MACOSX_DEPLOYMENT_TARGET=15.0 go build -ldflags '$(LDFLAGS)' -o hatch .
+	go build -ldflags '$(LDFLAGS) -extldflags -w' -o hatch .
 
 icon:
 	rsvg-convert -f png -w 44 -h 44 split-solid-full.svg -o internal/tray/icon.png
