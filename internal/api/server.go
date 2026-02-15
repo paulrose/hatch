@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/paulrose/hatch/internal/certs"
 	"github.com/paulrose/hatch/internal/health"
 )
 
@@ -23,6 +24,7 @@ type Server struct {
 	httpSrv   *http.Server
 	daemon    DaemonControl
 	health    *health.Checker
+	caPaths   certs.CAPaths
 	version   string
 	startTime time.Time
 	logHub    *LogHub
@@ -34,6 +36,7 @@ type ServerConfig struct {
 	Addr      string
 	Health    *health.Checker
 	Daemon    DaemonControl
+	CAPaths   certs.CAPaths
 	Version   string
 	StartTime time.Time
 	LogHub    *LogHub
@@ -44,6 +47,7 @@ func NewServer(cfg ServerConfig) *Server {
 	s := &Server{
 		daemon:    cfg.Daemon,
 		health:    cfg.Health,
+		caPaths:   cfg.CAPaths,
 		version:   cfg.Version,
 		startTime: cfg.StartTime,
 		logHub:    cfg.LogHub,
@@ -94,5 +98,6 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/logs", s.handleLogs)
 	mux.HandleFunc("GET /api/config", s.handleGetConfig)
 	mux.HandleFunc("PUT /api/config", s.handlePutConfig)
+	mux.HandleFunc("GET /api/certs", s.handleCerts)
 	mux.HandleFunc("POST /api/restart", s.handleRestart)
 }

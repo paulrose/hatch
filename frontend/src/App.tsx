@@ -5,6 +5,7 @@ import { RouteMap } from "@/components/route-map";
 import { LogViewer } from "@/components/log-viewer";
 import { AddProjectDialog } from "@/components/add-project-dialog";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { useProjects } from "@/hooks/use-projects";
 import { useHealth } from "@/hooks/use-health";
 import { useStatus } from "@/hooks/use-status";
@@ -18,6 +19,7 @@ function App() {
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<string | null>(null);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   function handleDelete(name: string) {
     if (confirm(`Delete project "${name}"?`)) {
@@ -34,6 +36,7 @@ function App() {
         onAddProject={() => setAddOpen(true)}
         logsOpen={logsOpen}
         onToggleLogs={() => setLogsOpen((o) => !o)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-4">
         {loading && (
@@ -58,6 +61,7 @@ function App() {
       </main>
       {logsOpen && <LogViewer />}
       <AddProjectDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       {editTarget && editProject && (
         <EditProjectDialog
           open={!!editTarget}

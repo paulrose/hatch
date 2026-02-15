@@ -2,7 +2,9 @@ package api
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/paulrose/hatch/internal/certs"
 	"github.com/paulrose/hatch/internal/config"
 )
 
@@ -278,6 +281,10 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
+	if ct := r.Header.Get("Content-Type"); ct != "application/yaml" {
+		writeError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/yaml")
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -311,4 +318,54 @@ func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "reloaded"})
+}
+
+func (s *Server) handleCerts(w http.ResponseWriter, r *http.Request) {
+	type certInfo struct {
+		Exists  bool   `json:"exists"`
+		Subject string `json:"subject,omitempty"`
+		NotAfter string `json:"not_after,omitempty"`
+		Trusted *bool  `json:"trusted,omitempty"`
+	}
+
+	parseCert := func(path string) *x509.Certificate {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		block, _ := pem.Decode(data)
+		if block == nil {
+			return nil
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil
+		}
+		return cert
+	}
+
+	var rootCA, intermediateCA certInfo
+
+	if certs.CAExists(s.caPaths) {
+		rootCA.Exists = true
+		if cert := parseCert(s.caPaths.Cert); cert != nil {
+			rootCA.Subject = cert.Subject.CommonName
+			rootCA.NotAfter = cert.NotAfter.Format(time.RFC3339)
+		}
+		trusted := certs.IsCATrusted(s.caPaths.Cert)
+		rootCA.Trusted = &trusted
+	}
+
+	if certs.IntermediateCAExists(s.caPaths) {
+		intermediateCA.Exists = true
+		if cert := parseCert(s.caPaths.IntermediateCert); cert != nil {
+			intermediateCA.Subject = cert.Subject.CommonName
+			intermediateCA.NotAfter = cert.NotAfter.Format(time.RFC3339)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]certInfo{
+		"root_ca":         rootCA,
+		"intermediate_ca": intermediateCA,
+	})
 }

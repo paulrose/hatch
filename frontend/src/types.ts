@@ -34,3 +34,15 @@ export interface LogEntry {
   message: string;
   fields: Record<string, unknown>;
 }
+
+export interface CertInfo {
+  exists: boolean;
+  subject?: string;
+  not_after?: string;
+  trusted?: boolean;
+}
+
+export interface CertStatus {
+  root_ca: CertInfo;
+  intermediate_ca: CertInfo;
+}

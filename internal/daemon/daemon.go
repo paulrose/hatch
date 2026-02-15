@@ -147,6 +147,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		Addr:      "127.0.0.1:42824",
 		Health:    d.health,
 		Daemon:    d,
+		CAPaths:   d.caPaths,
 		Version:   d.version,
 		StartTime: d.startTime,
 		LogHub:    d.logHub,
