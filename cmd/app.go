@@ -23,6 +23,7 @@ var appCmd = &cobra.Command{
 
 		wailsApp := application.New(application.Options{
 			Name: "Hatch",
+			Icon: appIconData,
 			Mac: application.MacOptions{
 				ActivationPolicy: application.ActivationPolicyAccessory,
 			},
@@ -47,6 +48,7 @@ var appCmd = &cobra.Command{
 			Version: version,
 			App:     wailsApp,
 			Window:  window,
+			Icon:    appIconData,
 		})
 
 		wailsApp.OnShutdown(func() {

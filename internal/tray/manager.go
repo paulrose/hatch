@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/browser"
 	"github.com/rs/zerolog/log"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/paulrose/hatch/internal/config"
 	"github.com/paulrose/hatch/internal/daemon"
@@ -24,6 +25,7 @@ type ManagerConfig struct {
 	Version string
 	App     *application.App
 	Window  *application.WebviewWindow
+	Icon    []byte
 }
 
 // Manager orchestrates the system tray icon, menu, and health polling.
@@ -31,6 +33,7 @@ type Manager struct {
 	version string
 	app     *application.App
 	window  *application.WebviewWindow
+	icon    []byte
 	tray    *application.SystemTray
 	checker *health.Checker
 
@@ -44,6 +47,7 @@ func NewManager(cfg ManagerConfig) *Manager {
 		version: cfg.Version,
 		app:     cfg.App,
 		window:  cfg.Window,
+		icon:    cfg.Icon,
 	}
 }
 
@@ -67,6 +71,15 @@ func (m *Manager) Start() {
 	})
 	if err := m.checker.Start(cfg); err != nil {
 		log.Warn().Err(err).Msg("tray: failed to start health checker")
+	}
+
+	// Hide window on close instead of destroying it — removes the
+	// Dock icon but keeps the tray icon running.
+	if m.window != nil {
+		m.window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+			m.hideWindow()
+			e.Cancel()
+		})
 	}
 
 	m.done = make(chan struct{})
@@ -267,9 +280,18 @@ func (m *Manager) buildProjectItem(menu *application.Menu, name string, proj con
 
 func (m *Manager) showWindow() {
 	if m.window != nil {
+		setDockVisible(true)
+		setAppIcon(m.icon)
 		m.window.Show()
 		m.window.SetAlwaysOnTop(true)
 		m.window.SetAlwaysOnTop(false)
+	}
+}
+
+func (m *Manager) hideWindow() {
+	if m.window != nil {
+		m.window.Hide()
+		setDockVisible(false)
 	}
 }
 
