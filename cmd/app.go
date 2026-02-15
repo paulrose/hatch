@@ -42,6 +42,10 @@ var appCmd = &cobra.Command{
 			MinWidth:  800,
 			MinHeight: 600,
 			Hidden:    true,
+			Mac: application.MacWindow{
+				TitleBar: application.MacTitleBarHiddenInsetUnified,
+				InvisibleTitleBarHeight: 48,
+			},
 		})
 
 		mgr := tray.NewManager(tray.ManagerConfig{

@@ -10,8 +10,11 @@ interface HeaderProps {
 
 export function Header({ status, onAddProject }: HeaderProps) {
   return (
-    <header className="border-b border-border bg-card/50 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+    <header
+      className="border-b border-border bg-card/50 backdrop-blur-sm"
+      style={{ "--wails-draggable": "drag" } as React.CSSProperties}
+    >
+      <div className="mx-auto flex max-w-5xl items-center justify-between py-3 pr-4 pl-24">
         <div className="flex items-center gap-3">
           <h1 className="font-heading text-2xl text-muted-teal uppercase tracking-tight">
             Hatch
@@ -25,10 +28,12 @@ export function Header({ status, onAddProject }: HeaderProps) {
             </>
           )}
         </div>
-        <Button size="sm" onClick={onAddProject}>
-          <Plus />
-          Add Project
-        </Button>
+        <div style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}>
+          <Button size="sm" onClick={onAddProject}>
+            <Plus />
+            Add Project
+          </Button>
+        </div>
       </div>
     </header>
   );
