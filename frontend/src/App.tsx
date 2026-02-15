@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Header } from "@/components/header";
 import { ProjectList } from "@/components/project-list";
 import { RouteMap } from "@/components/route-map";
+import { LogViewer } from "@/components/log-viewer";
 import { AddProjectDialog } from "@/components/add-project-dialog";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
 import { useProjects } from "@/hooks/use-projects";
@@ -16,6 +17,7 @@ function App() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<string | null>(null);
+  const [logsOpen, setLogsOpen] = useState(false);
 
   function handleDelete(name: string) {
     if (confirm(`Delete project "${name}"?`)) {
@@ -26,9 +28,14 @@ function App() {
   const editProject = editTarget ? projects[editTarget] : null;
 
   return (
-    <div className="min-h-screen bg-linen">
-      <Header status={status} onAddProject={() => setAddOpen(true)} />
-      <main className="mx-auto max-w-5xl p-4">
+    <div className="flex min-h-screen flex-col bg-linen">
+      <Header
+        status={status}
+        onAddProject={() => setAddOpen(true)}
+        logsOpen={logsOpen}
+        onToggleLogs={() => setLogsOpen((o) => !o)}
+      />
+      <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-4">
         {loading && (
           <p className="py-16 text-center text-text-muted">Loading…</p>
         )}
@@ -49,6 +56,7 @@ function App() {
           </>
         )}
       </main>
+      {logsOpen && <LogViewer />}
       <AddProjectDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} />
       {editTarget && editProject && (
         <EditProjectDialog

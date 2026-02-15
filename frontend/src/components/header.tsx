@@ -1,14 +1,17 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DaemonStatus } from "@/types";
-import { Plus } from "lucide-react";
+import { Plus, ScrollText } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   status: DaemonStatus | null;
   onAddProject: () => void;
+  logsOpen: boolean;
+  onToggleLogs: () => void;
 }
 
-export function Header({ status, onAddProject }: HeaderProps) {
+export function Header({ status, onAddProject, logsOpen, onToggleLogs }: HeaderProps) {
   return (
     <header
       className="border-b border-border bg-card/50 backdrop-blur-sm"
@@ -28,7 +31,16 @@ export function Header({ status, onAddProject }: HeaderProps) {
             </>
           )}
         </div>
-        <div style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}>
+        <div className="flex items-center gap-2" style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}>
+          <Button
+            size="sm"
+            variant={logsOpen ? "default" : "outline"}
+            onClick={onToggleLogs}
+            className={cn(logsOpen && "bg-muted-teal text-white")}
+          >
+            <ScrollText />
+            Logs
+          </Button>
           <Button size="sm" onClick={onAddProject}>
             <Plus />
             Add Project

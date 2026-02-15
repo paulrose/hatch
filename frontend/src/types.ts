@@ -26,3 +26,11 @@ export interface ServiceHealth {
   since: string;
   last_check: string;
 }
+
+export interface LogEntry {
+  id: number;
+  timestamp: string;
+  level: string;
+  message: string;
+  fields: Record<string, unknown>;
+}
