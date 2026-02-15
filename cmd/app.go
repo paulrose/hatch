@@ -23,6 +23,7 @@ var appCmd = &cobra.Command{
 
 		wailsApp := application.New(application.Options{
 			Name: "Hatch",
+			Icon: appIconData,
 			Mac: application.MacOptions{
 				ActivationPolicy: application.ActivationPolicyAccessory,
 			},
@@ -41,12 +42,17 @@ var appCmd = &cobra.Command{
 			MinWidth:  800,
 			MinHeight: 600,
 			Hidden:    true,
+			Mac: application.MacWindow{
+				TitleBar: application.MacTitleBarHiddenInsetUnified,
+				InvisibleTitleBarHeight: 48,
+			},
 		})
 
 		mgr := tray.NewManager(tray.ManagerConfig{
 			Version: version,
 			App:     wailsApp,
 			Window:  window,
+			Icon:    appIconData,
 		})
 
 		wailsApp.OnShutdown(func() {
